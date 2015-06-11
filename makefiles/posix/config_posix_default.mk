@@ -11,6 +11,7 @@ MODULES		+= drivers/hil
 MODULES		+= drivers/rgbled
 MODULES		+= drivers/led
 MODULES		+= modules/sensors
+MODULES		+= drivers/camera_trigger
 #MODULES		+= drivers/ms5611
 
 #

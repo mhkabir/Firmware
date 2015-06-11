@@ -22,6 +22,7 @@ MODULES		+= drivers/l3gd20
 MODULES		+= drivers/ms5611
 MODULES		+= drivers/gps
 MODULES		+= drivers/hil
+MODULES		+= drivers/camera_trigger
 MODULES		+= modules/sensors
 
 #

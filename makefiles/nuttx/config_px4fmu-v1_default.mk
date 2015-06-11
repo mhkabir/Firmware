@@ -36,6 +36,7 @@ MODULES		+= drivers/airspeed
 MODULES		+= drivers/ets_airspeed
 MODULES		+= drivers/meas_airspeed
 MODULES		+= drivers/frsky_telemetry
+MODULES		+= drivers/camera_trigger
 MODULES		+= modules/sensors
 
 #

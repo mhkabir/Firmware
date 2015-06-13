@@ -59,8 +59,6 @@
 #include <drivers/drv_hrt.h>
 #include <mavlink/mavlink_log.h>
 
-extern "C" __EXPORT int camera_trigger_main(int argc, char *argv[]);
-
 class CameraTrigger
 {
 public:
@@ -133,6 +131,11 @@ private:
 	static void	disengage(void *arg);
 
 };
+
+/*
+ * Driver 'main' command.
+ */
+extern "C" __EXPORT int camera_trigger_main(int argc, char *argv[]);
 
 namespace camera_trigger
 {
@@ -215,7 +218,6 @@ CameraTrigger::start()
 		warnx(" invalid trigger polarity setting. stopping.");
 		stop();
 	}
-	close(_gpio_fd);
 
 	poll(this);	/* Trampoline call */
 
@@ -230,6 +232,8 @@ CameraTrigger::stop()
 	if (camera_trigger::g_camera_trigger != nullptr) {
             delete (camera_trigger::g_camera_trigger);
 	}
+
+	close(_gpio_fd);
 }
 
 void
@@ -299,10 +303,8 @@ CameraTrigger::poll(void *arg)
 void
 CameraTrigger::engage(void *arg)
 {
-
 	CameraTrigger *trig = reinterpret_cast<CameraTrigger *>(arg);
-
-	trig->_gpio_fd = open(PX4FMU_DEVICE_PATH, 0);		
+	
 	if(trig->_gpio_fd == -1)	return;
 	
 	if(trig->_polarity == 0)  	// ACTIVE_LOW 
@@ -314,17 +316,13 @@ CameraTrigger::engage(void *arg)
 		px4_ioctl(trig->_gpio_fd, GPIO_SET, trig->pin);		
 	}
 	
-	close(trig->_gpio_fd);
-	
 }
 
 void
 CameraTrigger::disengage(void *arg)
 {
-
 	CameraTrigger *trig = reinterpret_cast<CameraTrigger *>(arg);
 		
-	trig->_gpio_fd = open(PX4FMU_DEVICE_PATH, 0);	
 	if(trig->_gpio_fd == -1)	return;
 	
 	if(trig->_polarity == 0)  	// ACTIVE_LOW 
@@ -335,9 +333,6 @@ CameraTrigger::disengage(void *arg)
 	{
 		px4_ioctl(trig->_gpio_fd, GPIO_CLEAR, trig->pin);		
 	}
-
-	close(trig->_gpio_fd);
-	
 }
 
 void

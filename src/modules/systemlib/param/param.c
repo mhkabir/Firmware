@@ -115,6 +115,13 @@ get_param_info_count(void)
 	if (!param_changed_storage) {
 		size_param_changed_storage_bytes  = (param_info_count / bits_per_allocation_unit) + 1;
 		param_changed_storage = calloc(size_param_changed_storage_bytes, 1);
+
+		/* If the allocation fails we need to indicate failure in the
+		 * API by returning PARAM_INVALID
+		 */
+		if (param_changed_storage == NULL) {
+			return 0;
+		}
 	}
 
 	return param_info_count;
@@ -166,7 +173,8 @@ param_assert_locked(void)
 static bool
 handle_in_range(param_t param)
 {
-	return (param < get_param_info_count());
+	int count = get_param_info_count();
+	return (count && param < count);
 }
 
 /**
@@ -247,6 +255,7 @@ param_find_internal(const char *name, bool notification)
 	param_t param;
 
 	/* perform a linear search of the known parameters */
+
 	for (param = 0; handle_in_range(param); param++) {
 		if (!strcmp(param_info_base[param].name, name)) {
 			if (notification) {
@@ -282,14 +291,16 @@ param_count(void)
 unsigned
 param_count_used(void)
 {
-	// ensure the allocation has been done
-	get_param_info_count();
 	unsigned count = 0;
 
-	for (unsigned i = 0; i < size_param_changed_storage_bytes; i++) {
-		for (unsigned j = 0; j < bits_per_allocation_unit; j++) {
-			if (param_changed_storage[i] & (1 << j)) {
-				count++;
+	// ensure the allocation has been done
+	if (get_param_info_count()) {
+
+		for (unsigned i = 0; i < size_param_changed_storage_bytes; i++) {
+			for (unsigned j = 0; j < bits_per_allocation_unit; j++) {
+				if (param_changed_storage[i] & (1 << j)) {
+					count++;
+				}
 			}
 		}
 	}
@@ -300,7 +311,9 @@ param_count_used(void)
 param_t
 param_for_index(unsigned index)
 {
-	if (index < get_param_info_count()) {
+	unsigned count = get_param_info_count();
+
+	if (count && index < count) {
 		return (param_t)index;
 	}
 
@@ -310,20 +323,20 @@ param_for_index(unsigned index)
 param_t
 param_for_used_index(unsigned index)
 {
-	if (index < get_param_info_count()) {
+	int count = get_param_info_count();
 
+	if (count && index < count) {
 		/* walk all params and count */
-		int count = 0;
 
 		for (unsigned i = 0; i < (unsigned)size_param_changed_storage_bytes; i++) {
-			for (unsigned j = 0; j < 8; j++) {
+			for (unsigned j = 0; j < bits_per_allocation_unit; j++) {
 				if (param_changed_storage[i] & (1 << j)) {
 
 					/* we found the right used count,
 					 * return the param value
 					 */
 					if (index == count) {
-						return (param_t)(i * 8 + j);
+						return (param_t)(i * bits_per_allocation_unit + j);
 					}
 
 					count++;
@@ -357,10 +370,10 @@ param_get_used_index(param_t param)
 	int count = 0;
 
 	for (unsigned i = 0; i < (unsigned)size_param_changed_storage_bytes; i++) {
-		for (unsigned j = 0; j < 8; j++) {
+		for (unsigned j = 0; j < bits_per_allocation_unit; j++) {
 			if (param_changed_storage[i] & (1 << j)) {
 
-				if ((unsigned)param == i * 8 + j) {
+				if ((unsigned)param == i * bits_per_allocation_unit + j) {
 					return count;
 				}
 
@@ -682,7 +695,7 @@ param_reset_excludes(const char *excludes[], int num_excludes)
 	param_notify_changes();
 }
 
-static const char *param_default_file = "/eeprom/parameters";
+static const char *param_default_file = PX4_ROOTFSDIR"/eeprom/parameters";
 static char *param_user_file = NULL;
 
 int

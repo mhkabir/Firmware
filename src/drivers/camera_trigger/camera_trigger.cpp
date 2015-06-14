@@ -35,7 +35,7 @@
 /**
  * @file camera_trigger.cpp
  *
- * External camera-IMU synchronisation and triggering via FMU auxillary pins.
+ * External camera-IMU synchronisation and triggering via FMU auxillary _pins.
  *
  * @author Mohammed Kabir <mhkabir98@gmail.com>
  */
@@ -58,8 +58,6 @@
 #include <drivers/drv_gpio.h>
 #include <drivers/drv_hrt.h>
 #include <mavlink/mavlink_log.h>
-
-extern "C" __EXPORT int camera_trigger_main(int argc, char *argv[]);
 
 class CameraTrigger
 {
@@ -89,14 +87,14 @@ public:
 	 */
 	void		info();
 		
-	int 		pin;
+	int 		_pin;
 	
 private:
 	
 	struct hrt_call		_pollcall;
 	struct hrt_call		_firecall;
 	
-	int 			_gpio_fd;
+	int 			_gpio_fd0, _gpio_fd1, _gpio_fd2;
 
 	int 			_polarity;
 	float 			_activation_time;
@@ -134,6 +132,11 @@ private:
 
 };
 
+/*
+ * Driver 'main' command.
+ */
+extern "C" __EXPORT int camera_trigger_main(int argc, char *argv[]);
+
 namespace camera_trigger
 {
 
@@ -141,10 +144,12 @@ CameraTrigger	*g_camera_trigger;
 }
 
 CameraTrigger::CameraTrigger() :
-	pin(1),
+	_pin(1),
 	_pollcall{},
 	_firecall{},
-	_gpio_fd(-1),
+	_gpio_fd0(-1),
+	_gpio_fd1(-1),
+	_gpio_fd2(-1),
 	_polarity(0),
 	_activation_time(0.0f),
 	_integration_time(0.0f),
@@ -181,9 +186,9 @@ void
 CameraTrigger::start()
 {
 
-	_gpio_fd = open(PX4FMU_DEVICE_PATH, 0);
+	_gpio_fd0 = open(PX4FMU_DEVICE_PATH, 0);
 
-	if (_gpio_fd < 0) {
+	if (_gpio_fd0 < 0) {
 		warnx("GPIO device open fail");
 		stop();
 	}
@@ -200,22 +205,22 @@ CameraTrigger::start()
 	param_get(integration_time, &_integration_time); 	
 	param_get(transfer_time, &_transfer_time); 
 
-	px4_ioctl(_gpio_fd, GPIO_SET_OUTPUT, pin);
+	px4_ioctl(_gpio_fd0, GPIO_SET_OUTPUT, _pin);
 	
 	if(_polarity == 0)
 	{
-		px4_ioctl(_gpio_fd, GPIO_SET, pin); 	/* GPIO pin pull high */
+		px4_ioctl(_gpio_fd0, GPIO_SET, _pin); 	/* GPIO _pin pull high */
 	}
 	else if(_polarity == 1)
 	{
-		px4_ioctl(_gpio_fd, GPIO_CLEAR, pin); 	/* GPIO pin pull low */
+		px4_ioctl(_gpio_fd0, GPIO_CLEAR, _pin); 	/* GPIO _pin pull low */
 	}	
 	else
 	{
-		warnx(" invalid trigger polarity setting. stopping.");
+		warnx(" invalid trigger polarity setting. stop_ping.");
 		stop();
 	}
-	close(_gpio_fd);
+	close(_gpio_fd0);
 
 	poll(this);	/* Trampoline call */
 
@@ -230,6 +235,7 @@ CameraTrigger::stop()
 	if (camera_trigger::g_camera_trigger != nullptr) {
             delete (camera_trigger::g_camera_trigger);
 	}
+	warnx("Camera Trigger routine stopped");
 }
 
 void
@@ -240,6 +246,9 @@ CameraTrigger::poll(void *arg)
 
 	bool updated;
 	orb_check(trig->_vcommand_sub, &updated);
+
+	if(trig->_gpio_fd == -1)
+		return;
 	
 	if (updated) {
 		
@@ -299,52 +308,53 @@ CameraTrigger::poll(void *arg)
 void
 CameraTrigger::engage(void *arg)
 {
-
 	CameraTrigger *trig = reinterpret_cast<CameraTrigger *>(arg);
+	
+	trig->_gpio_fd0 = open(PX4FMU_DEVICE_PATH, 0);
 
-	trig->_gpio_fd = open(PX4FMU_DEVICE_PATH, 0);		
-	if(trig->_gpio_fd == -1)	return;
+	if(trig->_gpio_fd1 == -1)
+		return;
 	
 	if(trig->_polarity == 0)  	// ACTIVE_LOW 
 	{
-		px4_ioctl(trig->_gpio_fd, GPIO_CLEAR, trig->pin);	
+		px4_ioctl(trig->_gpio_fd0, GPIO_CLEAR, trig->_pin);	
 	}
 	else if(trig->_polarity == 1)	// ACTIVE_HIGH 
 	{
-		px4_ioctl(trig->_gpio_fd, GPIO_SET, trig->pin);		
+		px4_ioctl(trig->_gpio_fd0, GPIO_SET, trig->_pin);		
 	}
-	
-	close(trig->_gpio_fd);
+
+	close(trig->_gpio_fd0);
 	
 }
 
 void
 CameraTrigger::disengage(void *arg)
 {
-
 	CameraTrigger *trig = reinterpret_cast<CameraTrigger *>(arg);
-		
-	trig->_gpio_fd = open(PX4FMU_DEVICE_PATH, 0);	
-	if(trig->_gpio_fd == -1)	return;
+	
+	trig->_gpio_fd1 = open(PX4FMU_DEVICE_PATH, 0);
+
+	if(trig->_gpio_fd1 == -1)
+		return;
 	
 	if(trig->_polarity == 0)  	// ACTIVE_LOW 
 	{
-		px4_ioctl(trig->_gpio_fd, GPIO_SET, trig->pin);	
+		px4_ioctl(trig->_gpio_fd1, GPIO_SET, trig->_pin);	
 	}
 	else if(trig->_polarity == 1)	// ACTIVE_HIGH 
 	{
-		px4_ioctl(trig->_gpio_fd, GPIO_CLEAR, trig->pin);		
+		px4_ioctl(trig->_gpio_fd1, GPIO_CLEAR, trig->_pin);		
 	}
 
-	close(trig->_gpio_fd);
-	
+	close(trig->_gpio_fd1);
 }
 
 void
 CameraTrigger::info()
 {
 	warnx("Trigger state : %s", _trigger_enabled ? "enabled" : "disabled");
-	warnx("Trigger pin : %i", pin);
+	warnx("Trigger _pin : %i", _pin);
 	warnx("Trigger polarity : %s", _polarity ? "ACTIVE_HIGH" : "ACTIVE_LOW");
 	warnx("Shutter integration time : %.2f", (double)_integration_time);
 }
@@ -352,7 +362,7 @@ CameraTrigger::info()
 static void usage()
 {
 	errx(1, "usage: camera_trigger {start|stop|info} [-p <n>]\n"
-		     "\t-p <n>\tUse specified AUX OUT pin number (default: 1)"
+		     "\t-p <n>\tUse specified AUX OUT _pin number (default: 1)"
 		    );
 }
 
@@ -376,10 +386,10 @@ int camera_trigger_main(int argc, char *argv[])
 		
 		if (argc > 3) {
 	
-			camera_trigger::g_camera_trigger->pin = (int)argv[3];
+			camera_trigger::g_camera_trigger->_pin = (int)argv[3];
 			if (atoi(argv[3]) > 0 && atoi(argv[3]) < 6) {	
-				warnx("starting trigger on pin : %li ", atoi(argv[3]));	
-				camera_trigger::g_camera_trigger->pin = atoi(argv[3]);
+				warnx("starting trigger on _pin : %li ", atoi(argv[3]));	
+				camera_trigger::g_camera_trigger->_pin = atoi(argv[3]);
 			}
 			else
 			{

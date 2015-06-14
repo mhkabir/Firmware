@@ -92,6 +92,8 @@ typedef param_t px4_param_t;
  */
 #if defined(__PX4_NUTTX)
 
+#define PX4_ROOTFSDIR 
+
 /* XXX this is a hack to resolve conflicts with NuttX headers */
 #if !defined(__PX4_TESTS)
 #define isspace(c) \
@@ -123,6 +125,7 @@ typedef param_t px4_param_t;
 /* FIXME - Used to satisfy build */
 //STM DocID018909 Rev 8 Sect 39.1 (Unique device ID Register)
 #define UNIQUE_ID       0x1FFF7A10  
+#define STM32_SYSMEM_UID "SIMULATIONID"
 
 /* FIXME - Used to satisfy build */
 #define getreg32(a)    (*(volatile uint32_t *)(a))
@@ -131,10 +134,16 @@ __BEGIN_DECLS
 extern long PX4_TICKS_PER_SEC;
 __END_DECLS
 
-#define USEC2TICK(x) (PX4_TICKS_PER_SEC*(long)(x)/1000000L)
-#define USEC_PER_TICK (1000000L/PX4_TICKS_PER_SEC)
+#define USEC_PER_TICK (1000000UL/PX4_TICKS_PER_SEC)
+#define USEC2TICK(x) (((x)+(USEC_PER_TICK/2))/USEC_PER_TICK) 
 
 #define px4_statfs_buf_f_bavail_t unsigned long
+
+#if defined(__PX4_QURT)
+#define PX4_ROOTFSDIR 
+#else
+#define PX4_ROOTFSDIR "rootfs"
+#endif
 
 #endif
 
@@ -145,6 +154,8 @@ __END_DECLS
 #if defined(__PX4_ROS) || defined(__PX4_POSIX)
 #define OK 0
 #define ERROR -1
+
+#define MAX_RAND 32767
 
 #if defined(__PX4_QURT)
 #define M_PI			3.14159265358979323846
@@ -196,6 +207,10 @@ __END_DECLS
 #endif
 
 #if defined(__PX4_QURT)
+
+#define PX4_ROOTFSDIR 
+#define DEFAULT_PARAM_FILE "/fs/eeprom/parameters"
+
 #define SIOCDEVPRIVATE 999999
 
 // Missing math.h defines

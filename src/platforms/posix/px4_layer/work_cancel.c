@@ -41,6 +41,7 @@
 #include <px4_defines.h>
 #include <queue.h>
 #include <px4_workqueue.h>
+#include "work_lock.h"
 
 #ifdef CONFIG_SCHED_WORKQUEUE
 
@@ -88,7 +89,6 @@
 int work_cancel(int qid, struct work_s *work)
 {
   struct wqueue_s *wqueue = &g_work[qid];
-  //irqstate_t flags;
 
   //DEBUGASSERT(work != NULL && (unsigned)qid < NWORKERS);
 
@@ -97,7 +97,7 @@ int work_cancel(int qid, struct work_s *work)
    * new work is typically added to the work queue from interrupt handlers.
    */
 
-  //flags = irqsave();
+  work_lock(qid);
   if (work->worker != NULL)
     {
       /* A little test of the integrity of the work queue */
@@ -113,7 +113,7 @@ int work_cancel(int qid, struct work_s *work)
       work->worker = NULL;
     }
 
-  //irqrestore(flags);
+  work_unlock(qid);
   return PX4_OK;
 }
 

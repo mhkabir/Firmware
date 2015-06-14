@@ -20,6 +20,7 @@ MODULES		+= drivers/camera_trigger
 MODULES	+= systemcmds/param
 MODULES += systemcmds/mixer
 MODULES += systemcmds/topic_listener
+MODULES	+= systemcmds/ver
 
 #
 # General system control
@@ -35,6 +36,7 @@ MODULES		+= modules/ekf_att_pos_estimator
 #
 # Vehicle Control
 #
+MODULES 	+= modules/navigator
 MODULES 	+= modules/mc_pos_control
 MODULES		+= modules/mc_att_control
 
@@ -48,6 +50,7 @@ MODULES		+= modules/dataman
 MODULES		+= modules/sdlog2
 MODULES		+= modules/simulator
 MODULES		+= modules/commander
+MODULES 	+= modules/controllib
 
 #
 # Libraries
@@ -68,6 +71,7 @@ MODULES		+= platforms/posix/drivers/adcsim
 MODULES		+= platforms/posix/drivers/barosim
 MODULES		+= platforms/posix/drivers/tonealrmsim
 MODULES		+= platforms/posix/drivers/airspeedsim
+MODULES 	+= platforms/posix/drivers/gpssim
 
 #
 # Unit tests
@@ -77,3 +81,7 @@ MODULES		+= platforms/posix/drivers/airspeedsim
 #MODULES		+= platforms/posix/tests/hrt_test
 #MODULES		+= platforms/posix/tests/wqueue
 
+#
+# muorb fastrpc changes.
+#
+#MODULES		+= $(PX4_BASE)../muorb_krait

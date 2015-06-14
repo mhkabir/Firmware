@@ -312,10 +312,8 @@ CameraTrigger::engage(void *arg)
 	
 	trig->_gpio_fd0 = open(PX4FMU_DEVICE_PATH, 0);
 
-	if(trig->_gpio_fd1 == -1) {
-		warnx("Failed to engage trigger");
+	if(trig->_gpio_fd1 == -1)
 		return;
-	}
 	
 	if(trig->_polarity == 0)  	// ACTIVE_LOW 
 	{
@@ -337,10 +335,8 @@ CameraTrigger::disengage(void *arg)
 	
 	trig->_gpio_fd1 = open(PX4FMU_DEVICE_PATH, 0);
 
-	if(trig->_gpio_fd1 == -1) {
-		warnx("Failed to disengage trigger");
+	if(trig->_gpio_fd1 == -1)
 		return;
-	}
 	
 	if(trig->_polarity == 0)  	// ACTIVE_LOW 
 	{

@@ -85,6 +85,13 @@ extern "C" {
 	}
 }
 
+static void print_prompt();
+static void usage();
+static void restore_term(void);
+static void run_cmd(const vector<string> &appargs, bool exit_on_fail, bool silently_fail);
+static void process_line(string &line, bool exit_on_fail);
+static void run_command_file(const char *file);
+
 static void print_prompt()
 {
 	cout.flush();
@@ -92,7 +99,56 @@ static void print_prompt()
 	cout.flush();
 }
 
-static void run_cmd(const vector<string> &appargs, bool exit_on_fail, bool silently_fail = false)
+static void usage()
+{
+
+	cout << "./mainapp [-d] [startup_config] -h" << std::endl;
+	cout << "   -d            - Optional flag to run the app in daemon mode and does not listen for user input." <<
+	     std::endl;
+	cout << "                   This is needed if mainapp is intended to be run as a upstart job on linux" << std::endl;
+	cout << "<startup_config> - config file for starting/stopping px4 modules" << std::endl;
+	cout << "   -h            - help/usage information" << std::endl;
+}
+
+static void restore_term(void)
+{
+	cout << "Restoring terminal\n";
+	tcsetattr(0, TCSANOW, &orig_term);
+}
+
+void run_command_file(const char *file)
+{
+	if (file != nullptr) {
+		ifstream infile(file);
+
+		if (infile.is_open()) {
+			for (string line; getline(infile, line, '\n');) {
+
+				if (px4_exit_requested()) {
+					break;
+				}
+
+				// TODO: this should be true but for that we have to check all startup files
+				process_line(line, false);
+			}
+
+		} else {
+			PX4_WARN("Error opening file: %s", file);
+		}
+	}
+}
+
+static void process_line(string &line, bool exit_on_fail)
+{
+	vector<string> appargs(10);
+
+	stringstream(line) >> appargs[0] >> appargs[1] >> appargs[2] >> appargs[3] >> appargs[4] >> appargs[5] >> appargs[6] >>
+			   appargs[7] >> appargs[8] >> appargs[9];
+	run_cmd(appargs, exit_on_fail, false);
+}
+
+
+static void run_cmd(const vector<string> &appargs, bool exit_on_fail, bool silently_fail)
 {
 	// command is appargs[0]
 	string command = appargs[0];
@@ -119,6 +175,14 @@ static void run_cmd(const vector<string> &appargs, bool exit_on_fail, bool silen
 			}
 		}
 
+	} else if (command.compare("sh") == 0) {
+		if (appargs[1].length() == 0) {
+			PX4_WARN("sh : No file specified");
+
+		} else {
+			run_command_file(appargs[1].c_str());
+		}
+
 	} else if (command.compare("help") == 0) {
 		list_builtins();
 
@@ -129,32 +193,6 @@ static void run_cmd(const vector<string> &appargs, bool exit_on_fail, bool silen
 		cout << "Invalid command: " << command << "\ntype 'help' for a list of commands" << endl;
 
 	}
-}
-
-static void usage()
-{
-
-	cout << "./mainapp [-d] [startup_config] -h" << std::endl;
-	cout << "   -d            - Optional flag to run the app in daemon mode and does not listen for user input." <<
-	     std::endl;
-	cout << "                   This is needed if mainapp is intended to be run as a upstart job on linux" << std::endl;
-	cout << "<startup_config> - config file for starting/stopping px4 modules" << std::endl;
-	cout << "   -h            - help/usage information" << std::endl;
-}
-
-static void process_line(string &line, bool exit_on_fail)
-{
-	vector<string> appargs(10);
-
-	stringstream(line) >> appargs[0] >> appargs[1] >> appargs[2] >> appargs[3] >> appargs[4] >> appargs[5] >> appargs[6] >>
-			   appargs[7] >> appargs[8] >> appargs[9];
-	run_cmd(appargs, exit_on_fail);
-}
-
-static void restore_term(void)
-{
-	cout << "Restoring terminal\n";
-	tcsetattr(0, TCSANOW, &orig_term);
 }
 
 bool px4_exit_requested(void)
@@ -228,25 +266,8 @@ int main(int argc, char **argv)
 
 	px4::init(argc, argv, "mainapp");
 
-	// if commandfile is present, process the commands from the file
-	if (commands_file != nullptr) {
-		ifstream infile(commands_file);
-
-		if (infile.is_open()) {
-			for (string line; getline(infile, line, '\n');) {
-
-				if (px4_exit_requested()) {
-					break;
-				}
-
-				// TODO: this should be true but for that we have to check all startup files
-				process_line(line, false);
-			}
-
-		} else {
-			PX4_WARN("Error opening file: %s", commands_file);
-		}
-	}
+	// process the commands from file
+	run_command_file(commands_file);
 
 	if (chroot_on) {
 		// Lock this application in the current working dir
@@ -397,7 +418,7 @@ int main(int argc, char **argv)
 	}
 
 	vector<string> shutdown_cmd = { "shutdown" };
-	run_cmd(shutdown_cmd, true);
+	run_cmd(shutdown_cmd, true, false);
 	DriverFramework::Framework::shutdown();
 
 	return OK;

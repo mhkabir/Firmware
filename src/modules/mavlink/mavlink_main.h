@@ -452,6 +452,7 @@ private:
 	bool			_hil_enabled;		/**< Hardware In the Loop mode */
 	bool			_generate_rc;		/**< Generate RC messages from manual input MAVLink messages */
 	bool			_use_hil_gps;		/**< Accept GPS HIL messages (for example from an external motion capturing system to fake indoor gps) */
+	bool			_force_flow_control;
 	bool			_forward_externalsp;	/**< Forward external setpoint messages to controllers directly if in offboard mode */
 	bool			_is_usb_uart;		/**< Port is USB */
 	bool			_wait_to_transmit;  	/**< Wait to transmit until received messages. */
@@ -560,6 +561,7 @@ private:
 	param_t			_param_use_hil_gps;
 	param_t			_param_forward_externalsp;
 	param_t			_param_broadcast;
+	param_t			_param_force_fctl;
 
 	unsigned		_system_type;
 	static bool		_config_link_on;

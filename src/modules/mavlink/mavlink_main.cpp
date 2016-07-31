@@ -175,6 +175,7 @@ Mavlink::Mavlink() :
 	_hil_enabled(false),
 	_generate_rc(false),
 	_use_hil_gps(false),
+	_force_flow_control(false),
 	_forward_externalsp(false),
 	_is_usb_uart(false),
 	_wait_to_transmit(false),
@@ -249,6 +250,7 @@ Mavlink::Mavlink() :
 	_param_use_hil_gps(PARAM_INVALID),
 	_param_forward_externalsp(PARAM_INVALID),
 	_param_broadcast(PARAM_INVALID),
+	_param_force_fctl(PARAM_INVALID),
 	_system_type(0),
 
 	/* performance counters */
@@ -550,6 +552,7 @@ void Mavlink::mavlink_update_system(void)
 		_param_use_hil_gps = param_find("MAV_USEHILGPS");
 		_param_forward_externalsp = param_find("MAV_FWDEXTSP");
 		_param_broadcast = param_find("MAV_BROADCAST");
+		_param_force_fctl = param_find("MAV_FRC_FCTL");
 
 		/* test param - needs to be referenced, but is unused */
 		(void)param_find("MAV_TEST_PAR");
@@ -611,10 +614,15 @@ void Mavlink::mavlink_update_system(void)
 
 	int32_t forward_externalsp;
 	param_get(_param_forward_externalsp, &forward_externalsp);
+	
+	_forward_externalsp = (bool)forward_externalsp;
 
 	param_get(_param_broadcast, &_broadcast_mode);
+	
+	int32_t force_fctl;
+	param_get(_param_force_fctl, &force_fctl);
 
-	_forward_externalsp = (bool)forward_externalsp;
+	_force_flow_control = (bool)force_fctl;
 }
 
 int Mavlink::get_system_id()
@@ -885,7 +893,7 @@ Mavlink::get_free_tx_buf()
 		buf_free = 256;
 #endif
 
-		if (get_flow_control_enabled() && buf_free < FLOW_CONTROL_DISABLE_THRESHOLD) {
+		if (get_flow_control_enabled() && buf_free < FLOW_CONTROL_DISABLE_THRESHOLD && !(_mode == MAVLINK_MODE_ONBOARD && _force_flow_control)) {
 			/* Disable hardware flow control:
 			 * if no successful write since a defined time
 			 * and if the last try was not the last successful write

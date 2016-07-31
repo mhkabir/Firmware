@@ -122,3 +122,12 @@ PARAM_DEFINE_INT32(MAV_BROADCAST, 0);
  * @max 1000
  */
 PARAM_DEFINE_INT32(MAV_TEST_PAR, 1);
+
+/**
+ * Force flow control
+ *
+ * @group MAVLink
+ * @min -1000
+ * @max 1000
+ */
+PARAM_DEFINE_INT32(MAV_FRC_FCTL, 0);

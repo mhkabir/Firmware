@@ -327,7 +327,7 @@ then
 		unset HIL
 	else
 		unset HIL
-		gps start
+		#gps start
 	fi
 
 	# waypoint storage
@@ -511,16 +511,8 @@ then
 		fi
 	fi
 
-	if [ $MAVLINK_F == "none" ]
-	then
-	else
-		mavlink start $MAVLINK_F
-	fi
 	unset MAVLINK_F
 
-	#
-	# MAVLink onboard / TELEM2
-	#
 	if ver hwcmp PX4FMU_V1
 	then
 	else
@@ -643,7 +635,7 @@ then
 	if ver hwcmp PX4FMU_V2
 	then
 		# Check for flow sensor - as it is a background task, launch it last
-		px4flow start &
+		# px4flow start &
 	fi
 
 	if ver hwcmp MINDPX_V2

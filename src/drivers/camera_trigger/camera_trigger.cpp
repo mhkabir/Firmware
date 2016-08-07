@@ -435,7 +435,6 @@ CameraTrigger::cycle_trampoline(void *arg)
 					trig->control(false);
 
 				} else if (cmd.param1 >= 1.0f) {
-					// reset sequence
 					trig->_trigger_seq = 0;
 					trig->control(true);
 					// while the trigger is active there is no

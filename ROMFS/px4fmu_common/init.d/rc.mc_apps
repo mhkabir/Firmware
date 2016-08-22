@@ -27,6 +27,11 @@ if param compare SYS_MC_EST_GROUP 2
 then
 	ekf2 start
 fi
+
+if param compare SYS_MC_EST_GROUP 3
+then
+	attitude_estimator_q start
+fi
 #---------------------------------------
 
 mc_att_control start

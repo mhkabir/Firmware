@@ -15,6 +15,9 @@ float32 epv			# GPS vertical position accuracy (metres)
 float32 hdop			# Horizontal dilution of precision
 float32 vdop			# Vertical dilution of precision
 
+float32[3] pos_covariance
+float32[3] vel_covariance
+
 int32 noise_per_ms		# GPS noise per millisecond
 int32 jamming_indicator		# indicates jamming is occurring
 

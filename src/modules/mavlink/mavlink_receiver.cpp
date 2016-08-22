@@ -141,7 +141,10 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_rates_sp{},
 	_time_offset_avg_alpha(0.6),
 	_time_offset(0),
-	_orb_class_instance(-1),
+	_dist_class_instance(-1),
+	_lpos_class_instance(-1),
+	_gpos_class_instance(-1),
+	_att_class_instance(-1),
 	_mom_switch_pos{},
 	_mom_switch_state(0)
 {
@@ -209,6 +212,17 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 
 	case MAVLINK_MSG_ID_VISION_POSITION_ESTIMATE:
 		handle_message_vision_position_estimate(msg);
+		break;
+	
+	// external state messages
+	case MAVLINK_MSG_ID_ATTITUDE_QUATERNION_COV:
+		handle_message_attitude_quaternion_cov(msg);
+		break;
+	case MAVLINK_MSG_ID_LOCAL_POSITION_NED_COV:
+		handle_message_local_position_ned_cov(msg);
+		break;
+	case MAVLINK_MSG_ID_GPS_GLOBAL_ORIGIN:
+		handle_message_gps_global_origin(msg);
 		break;
 
 	case MAVLINK_MSG_ID_RADIO_STATUS:
@@ -550,7 +564,7 @@ MavlinkReceiver::handle_message_optical_flow_rad(mavlink_message_t *msg)
 
 		if (_flow_distance_sensor_pub == nullptr) {
 			_flow_distance_sensor_pub = orb_advertise_multi(ORB_ID(distance_sensor), &d,
-						    &_orb_class_instance, ORB_PRIO_HIGH);
+						    &_dist_class_instance, ORB_PRIO_HIGH);
 
 		} else {
 			orb_publish(ORB_ID(distance_sensor), _flow_distance_sensor_pub, &d);
@@ -603,7 +617,7 @@ MavlinkReceiver::handle_message_hil_optical_flow(mavlink_message_t *msg)
 
 	if (_hil_distance_sensor_pub == nullptr) {
 		_hil_distance_sensor_pub = orb_advertise_multi(ORB_ID(distance_sensor), &d,
-					   &_orb_class_instance, ORB_PRIO_HIGH);
+					   &_dist_class_instance, ORB_PRIO_HIGH);
 
 	} else {
 		orb_publish(ORB_ID(distance_sensor), _hil_distance_sensor_pub, &d);
@@ -667,7 +681,7 @@ MavlinkReceiver::handle_message_distance_sensor(mavlink_message_t *msg)
 
 	if (_distance_sensor_pub == nullptr) {
 		_distance_sensor_pub = orb_advertise_multi(ORB_ID(distance_sensor), &d,
-				       &_orb_class_instance, ORB_PRIO_HIGH);
+				       &_dist_class_instance, ORB_PRIO_HIGH);
 
 	} else {
 		orb_publish(ORB_ID(distance_sensor), _distance_sensor_pub, &d);
@@ -993,6 +1007,94 @@ MavlinkReceiver::handle_message_vision_position_estimate(mavlink_message_t *msg)
 
 	} else {
 		orb_publish(ORB_ID(vision_position_estimate), _vision_position_pub, &vision_position);
+	}
+}
+
+// External state messages
+
+void
+MavlinkReceiver::handle_message_gps_global_origin(mavlink_message_t *msg)
+{
+	mavlink_gps_global_origin_t origin;
+	mavlink_msg_gps_global_origin_decode(msg, &origin);
+	
+	if (!globallocalconverter_initialized()) {
+		/* set reference for global coordinates <--> local coordiantes conversion and map_projection */
+		globallocalconverter_init((double)origin.latitude * 1.0e-7, (double)origin.longitude * 1.0e-7,
+					  (float)origin.altitude * 1.0e-3f, hrt_absolute_time());
+	}
+}
+
+void
+MavlinkReceiver::handle_message_attitude_quaternion_cov(mavlink_message_t *msg)
+{
+	mavlink_attitude_quaternion_cov_t att;
+	mavlink_msg_attitude_quaternion_cov_decode(msg, &att);
+	
+	//TODO fuse yaw in att estimator potentially
+}
+
+void
+MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
+{
+	mavlink_local_position_ned_cov_t pos;
+	mavlink_msg_local_position_ned_cov_decode(msg, &pos);
+
+	struct vehicle_local_position_s local_position = {};
+	
+	local_position.timestamp = sync_stamp(pos.time_usec);
+	
+	local_position.estimator_type = pos.estimator_type;
+	
+	local_position.xy_valid = true;
+	local_position.z_valid = true;
+	local_position.v_xy_valid = true;
+	local_position.v_z_valid = true;
+
+	local_position.x = pos.x;
+	local_position.y = pos.y;
+	local_position.z = pos.z;
+
+	local_position.vx = pos.vx;
+	local_position.vy = pos.vy;
+	local_position.vz = pos.vz;
+	
+	local_position.ax = pos.ax;
+	local_position.ay = pos.ay;
+	local_position.az = pos.az;
+	
+	local_position.xy_global = globallocalconverter_initialized();
+	local_position.z_global = globallocalconverter_initialized();
+	
+	// TODO yaw and rest of the crap and eph
+	local_position.eph = 1.0; //sqrtf(fmaxf(pos.covariance));
+	local_position.epv = 1.0;
+	
+	local_position.dist_bottom_valid = false;
+	
+	local_position.ref_timestamp = _ref_timestamp;
+	globallocalconverter_getref(&local_position.ref_lat, &local_position.ref_lon, &local_position.ref_alt);
+	
+	orb_publish_auto(ORB_ID(vehicle_local_position), &_local_pos_pub, &local_position, &_lpos_class_instance, ORB_PRIO_HIGH);
+	
+	if(globallocalconverter_initialized())
+	{		
+		struct vehicle_global_position_s global_position = {};
+
+		global_position.timestamp = local_position.timestamp;
+		
+		globallocalconverter_toglobal(pos.x, pos.y, pos.z, &global_position.lat, &global_position.lon, &global_position.alt);
+
+		global_position.vel_n = pos.vx;
+		global_position.vel_e = pos.vy;
+		global_position.vel_d = pos.vz;
+		
+		// TODO set eph epv
+		global_position.eph = 1.0;
+		global_position.epv = 1.0;
+
+		orb_publish_auto(ORB_ID(vehicle_global_position), &_global_pos_pub, &global_position, &_gpos_class_instance, ORB_PRIO_HIGH);
+
 	}
 }
 

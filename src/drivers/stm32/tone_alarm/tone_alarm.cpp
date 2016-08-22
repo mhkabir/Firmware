@@ -403,7 +403,7 @@ ToneAlarm::ToneAlarm() :
 	_default_tunes[TONE_PARACHUTE_RELEASE_TUNE] = "MFT255L16agagagag";			// parachute release
 	_default_tunes[TONE_EKF_WARNING_TUNE] = "MFT255L8ddd#d#eeff";				// ekf warning
 	_default_tunes[TONE_BARO_WARNING_TUNE] = "MFT255L4gf#fed#d";				// baro warning
-	_default_tunes[TONE_SINGLE_BEEP_TUNE] = "MFT100a8";                             // single beep
+	_default_tunes[TONE_SINGLE_BEEP_TUNE] = "MFT100a8";                            		// single beep
 	_default_tunes[TONE_HOME_SET] = "MFT100L4>G#6A#6B#4";
 
 	_tune_names[TONE_STARTUP_TUNE] = "startup";			// startup tune

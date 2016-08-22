@@ -1978,22 +1978,7 @@ int commander_thread_main(int argc, char *argv[])
 
 		if (updated) {
 			/* position changed */
-			vehicle_global_position_s gpos;
-			orb_copy(ORB_ID(vehicle_global_position), global_position_sub, &gpos);
-
-			/* copy to global struct if valid, with hysteresis */
-
-			// XXX consolidate this with local position handling and timeouts after release
-			// but we want a low-risk change now.
-			if (status_flags.condition_global_position_valid) {
-				if (gpos.eph < eph_threshold * 2.5f) {
-					orb_copy(ORB_ID(vehicle_global_position), global_position_sub, &global_position);
-				}
-			} else {
-				if (gpos.eph < eph_threshold) {
-					orb_copy(ORB_ID(vehicle_global_position), global_position_sub, &global_position);
-				}
-			}
+			orb_copy(ORB_ID(vehicle_global_position), global_position_sub, &global_position);
 		}
 
 		/* update local position estimate */
@@ -2011,21 +1996,25 @@ int commander_thread_main(int argc, char *argv[])
 			/* position changed */
 			orb_copy(ORB_ID(vehicle_attitude), attitude_sub, &attitude);
 		}
+		
+		/* update condition_global_position_valid */
+		/* hysteresis for EPH */
+		bool global_eph_good;
 
-		//update condition_global_position_valid
-		//Global positions are only published by the estimators if they are valid
-		if (hrt_absolute_time() - global_position.timestamp > POSITION_TIMEOUT) {
-			//We have had no good fix for POSITION_TIMEOUT amount of time
-			if (status_flags.condition_global_position_valid) {
-				set_tune_override(TONE_GPS_WARNING_TUNE);
-				status_changed = true;
-				status_flags.condition_global_position_valid = false;
+		if (status_flags.condition_global_position_valid) {
+			if (global_position.eph > eph_threshold * 2.5f) {
+				global_eph_good = false;
+
+			} else {
+				global_eph_good = true;
 			}
-		} else if (global_position.timestamp != 0) {
-			// Got good global position estimate
-			if (!status_flags.condition_global_position_valid) {
-				status_changed = true;
-				status_flags.condition_global_position_valid = true;
+
+		} else {
+			if (global_position.eph < eph_threshold) {
+				global_eph_good = true;
+
+			} else {
+				global_eph_good = false;
 			}
 		}
 
@@ -2049,11 +2038,45 @@ int commander_thread_main(int argc, char *argv[])
 				local_eph_good = false;
 			}
 		}
-
+		
+		/* Local position validity checker */
+		bool lpos_valid_changed = false;
+		bool lalt_valid_changed = false;
+		
 		check_valid(local_position.timestamp, POSITION_TIMEOUT, local_position.xy_valid
-			    && local_eph_good, &(status_flags.condition_local_position_valid), &status_changed);
+			    && local_eph_good, &(status_flags.condition_local_position_valid), &lpos_valid_changed);
 		check_valid(local_position.timestamp, POSITION_TIMEOUT, local_position.z_valid,
-			    &(status_flags.condition_local_altitude_valid), &status_changed);
+			    &(status_flags.condition_local_altitude_valid), &lalt_valid_changed);	
+		
+		if (lpos_valid_changed || lalt_valid_changed) status_changed = true;
+		
+		if(lpos_valid_changed && status_flags.condition_local_position_valid)
+		{
+			mavlink_log_info(&mavlink_log_pub, "Local estimate valid");
+			set_tune_override(TONE_NOTIFY_POSITIVE_TUNE);
+		} else if (lpos_valid_changed && !status_flags.condition_local_position_valid)
+		{
+			mavlink_log_critical(&mavlink_log_pub, "Local estimate invalid");
+			set_tune_override(TONE_GPS_WARNING_TUNE);
+		}
+		
+		
+		/* Global position validity checker */
+		bool gpos_valid_changed = false;
+		
+		check_valid(global_position.timestamp, POSITION_TIMEOUT, local_position.xy_valid /* hack */
+			    && global_eph_good, &(status_flags.condition_global_position_valid), &gpos_valid_changed);
+			    
+		if (gpos_valid_changed) status_changed = true;
+		
+		if(gpos_valid_changed && status_flags.condition_global_position_valid)
+		{
+			mavlink_log_info(&mavlink_log_pub, "Global estimate valid");
+			set_tune_override(TONE_NOTIFY_NEUTRAL_TUNE);
+		} else if (gpos_valid_changed && !status_flags.condition_global_position_valid)
+		{
+			mavlink_log_critical(&mavlink_log_pub, "Global estimate invalid");
+		}
 
 		/* Update land detector */
 		orb_check(land_detector_sub, &updated);
@@ -2260,16 +2283,17 @@ int commander_thread_main(int argc, char *argv[])
 			orb_copy(ORB_ID(vehicle_gps_position), gps_sub, &gps_position);
 		}
 
-		/* Initialize map projection if gps is valid */
+		/* Initialize map projection if gps is valid
 		if (!map_projection_global_initialized()
 		    && (gps_position.eph < eph_threshold)
 		    && (gps_position.epv < epv_threshold)
 		    && hrt_elapsed_time((hrt_abstime *)&gps_position.timestamp) < 1e6) {
-			/* set reference for global coordinates <--> local coordiantes conversion and map_projection */
+			// set reference for global coordinates <--> local coordiantes conversion and map_projection
 			globallocalconverter_init((double)gps_position.lat * 1.0e-7, (double)gps_position.lon * 1.0e-7,
 						  (float)gps_position.alt * 1.0e-3f, hrt_absolute_time());
 		}
-
+		*/
+		
 		/* check if GPS is ok */
 		if (!status_flags.circuit_breaker_engaged_gpsfailure_check) {
 			bool gpsIsNoisy = gps_position.noise_per_ms > 0 && gps_position.noise_per_ms < COMMANDER_MAX_GPS_NOISE;
@@ -3060,7 +3084,7 @@ control_status_leds(vehicle_status_s *status_local, const actuator_armed_s *actu
 			} else if (battery_local->warning == battery_status_s::BATTERY_WARNING_CRITICAL) {
 				rgbled_set_color(RGBLED_COLOR_RED);
 			} else {
-				if (status_flags.condition_home_position_valid && status_flags.condition_global_position_valid) {
+				if ((status_flags.condition_home_position_valid && status_flags.condition_global_position_valid) || (status_flags.condition_local_position_valid) ) {
 					rgbled_set_color(RGBLED_COLOR_GREEN);
 
 				} else {

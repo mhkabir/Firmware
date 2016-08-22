@@ -1,5 +1,7 @@
 # Fused local position in NED.
 
+uint8 estimator_type
+
 bool xy_valid				# true if x and y are valid
 bool z_valid				# true if z is valid
 bool v_xy_valid				# true if vy and vy are valid
@@ -14,6 +16,11 @@ float32 z				# Down position (negative altitude) in NED earth-fixed frame, (metr
 float32 vx 				# North velocity in NED earth-fixed frame, (metres/sec)
 float32 vy				# East velocity in NED earth-fixed frame, (metres/sec)
 float32 vz				# Down velocity in NED earth-fixed frame, (metres/sec)
+
+# Acceleration in NED frame
+float32 ax 				# North acceleration in NED earth-fixed frame, (metres/sec^2)
+float32 ay				# East acceleration in NED earth-fixed frame, (metres/sec^2)
+float32 az				# Down acceleration in NED earth-fixed frame, (metres/sec^2)
 
 # Heading
 float32 yaw				# Euler yaw angle transforming the tangent plane relative to NED earth-fixed frame, -PI..+PI,  (radians) 

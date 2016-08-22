@@ -125,6 +125,10 @@ void UavcanGnssBridge::gnss_fix_sub_cb(const uavcan::ReceivedDataStructure<uavca
 
 		// Vertical position uncertainty
 		report.epv = (pos_cov[8] > 0) ? sqrtf(pos_cov[8]) : -1.0F;
+		
+		report.pos_covariance[0] = pos_cov[0];
+		report.pos_covariance[1] = pos_cov[4];
+		report.pos_covariance[2] = pos_cov[8];
 
 	} else {
 		report.eph = -1.0F;
@@ -154,6 +158,11 @@ void UavcanGnssBridge::gnss_fix_sub_cb(const uavcan::ReceivedDataStructure<uavca
 			(vel_e_sq * vel_cov[0] +
 			 -2 * vel_n * vel_e * vel_cov[1] +	// Covariance matrix is symmetric
 			 vel_n_sq * vel_cov[4]) / ((vel_n_sq + vel_e_sq) * (vel_n_sq + vel_e_sq));
+			 
+		
+		report.vel_covariance[0] = vel_cov[0];
+		report.vel_covariance[1] = vel_cov[4];
+		report.vel_covariance[2] = vel_cov[8];
 
 	} else {
 		report.s_variance_m_s = -1.0F;

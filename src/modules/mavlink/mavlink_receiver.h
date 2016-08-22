@@ -123,6 +123,9 @@ private:
 	void handle_message_set_mode(mavlink_message_t *msg);
 	void handle_message_att_pos_mocap(mavlink_message_t *msg);
 	void handle_message_vision_position_estimate(mavlink_message_t *msg);
+	void handle_message_gps_global_origin(mavlink_message_t *msg);
+	void handle_message_attitude_quaternion_cov(mavlink_message_t *msg);
+	void handle_message_local_position_ned_cov(mavlink_message_t *msg);
 	void handle_message_quad_swarm_roll_pitch_yaw_thrust(mavlink_message_t *msg);
 	void handle_message_set_position_target_local_ned(mavlink_message_t *msg);
 	void handle_message_set_actuator_control_target(mavlink_message_t *msg);
@@ -229,12 +232,16 @@ private:
 	float _hil_prev_gyro[3];
 	float _hil_prev_accel[3];
 	struct map_projection_reference_s _hil_local_proj_ref;
+	uint64_t _ref_timestamp;
 	struct offboard_control_mode_s _offboard_control_mode;
 	struct vehicle_attitude_setpoint_s _att_sp;
 	struct vehicle_rates_setpoint_s _rates_sp;
 	double _time_offset_avg_alpha;
 	int64_t _time_offset;
-	int	_orb_class_instance;
+	int	_dist_class_instance;
+	int	_lpos_class_instance;
+	int	_gpos_class_instance;
+	int	_att_class_instance;
 
 	static constexpr unsigned MOM_SWITCH_COUNT = 8;
 

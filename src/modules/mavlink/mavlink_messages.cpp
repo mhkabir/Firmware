@@ -89,6 +89,7 @@
 #include <uORB/topics/vision_position_estimate.h>
 #include <uORB/topics/vtol_vehicle_status.h>
 #include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/safety.h>
 #include <uORB/uORB.h>
 static uint16_t cm_uint16_from_m_float(float m);
 static void get_mavlink_mode_state(struct vehicle_status_s *status, uint8_t *mavlink_state,
@@ -3251,6 +3252,7 @@ public:
 private:
 	MavlinkOrbSubscription *_status_sub;
 	MavlinkOrbSubscription *_landed_sub;
+	MavlinkOrbSubscription *_safety_sub;
 	mavlink_extended_sys_state_t _msg;
 
 	/* do not allow top copying this class */
@@ -3261,16 +3263,19 @@ protected:
 	explicit MavlinkStreamExtendedSysState(Mavlink *mavlink) : MavlinkStream(mavlink),
 		_status_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_status))),
 		_landed_sub(_mavlink->add_orb_subscription(ORB_ID(vehicle_land_detected))),
+		_safety_sub(_mavlink->add_orb_subscription(ORB_ID(safety))),
 		_msg{}
 	{
 
 		_msg.vtol_state = MAV_VTOL_STATE_UNDEFINED;
 		_msg.landed_state = MAV_LANDED_STATE_UNDEFINED;
+		_msg.safety_state = MAV_SAFETY_STATE_UNDEFINED;
 	}
 
 	void send(const hrt_abstime t)
 	{
 		struct vehicle_status_s status;
+		struct safety_s safety_state;
 		struct vehicle_land_detected_s land_detected;
 		bool updated = false;
 
@@ -3301,6 +3306,20 @@ protected:
 
 			} else {
 				_msg.landed_state = MAV_LANDED_STATE_IN_AIR;
+			}
+		}
+		
+		if (_safety_sub->update(&safety_state)) {
+			updated = true;
+
+			if (safety_state.safety_switch_available) {
+				if(safety_state.safety_off)
+					_msg.safety_state = MAV_SAFETY_STATE_OFF;
+				else
+					_msg.safety_state = MAV_SAFETY_STATE_ON;
+
+			} else {
+				_msg.safety_state = MAV_SAFETY_STATE_UNDEFINED;
 			}
 		}
 

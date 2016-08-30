@@ -1031,7 +1031,19 @@ MavlinkReceiver::handle_message_attitude_quaternion_cov(mavlink_message_t *msg)
 	mavlink_attitude_quaternion_cov_t att;
 	mavlink_msg_attitude_quaternion_cov_decode(msg, &att);
 	
-	//TODO fuse yaw in att estimator potentially
+	struct vision_position_estimate_s vision_position = {};
+
+	vision_position.timestamp = sync_stamp(att.time_usec);
+	vision_position.timestamp_received = hrt_absolute_time();
+
+	vision_position.q[0] = att.q[0];
+	vision_position.q[1] = att.q[1];
+	vision_position.q[2] = att.q[2];
+	vision_position.q[3] = att.q[3];
+
+	int instance_id = 0;
+	orb_publish_auto(ORB_ID(vision_position_estimate), &_vision_position_pub, &vision_position, &instance_id, ORB_PRIO_HIGH);
+
 }
 
 void

@@ -1058,6 +1058,7 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	
 	local_position.estimator_type = pos.estimator_type;
 	
+	// Better fault detection TODO
 	local_position.xy_valid = true;
 	local_position.z_valid = true;
 	local_position.v_xy_valid = true;
@@ -1078,9 +1079,9 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	local_position.xy_global = globallocalconverter_initialized();
 	local_position.z_global = globallocalconverter_initialized();
 	
-	// TODO yaw and rest of the crap and eph
-	local_position.eph = 1.0; //sqrtf(fmaxf(pos.covariance));
-	local_position.epv = 1.0;
+	// TODO yaw and rest of the crap
+	local_position.eph = sqrtf(fmaxf(pos.covariance[0],pos.covariance[1]));
+	local_position.epv = sqrtf(pos.covariance[2]);
 	
 	local_position.dist_bottom_valid = false;
 	
@@ -1101,9 +1102,8 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 		global_position.vel_e = pos.vy;
 		global_position.vel_d = pos.vz;
 		
-		// TODO set eph epv
-		global_position.eph = 1.0;
-		global_position.epv = 1.0;
+		global_position.eph = sqrtf(fmaxf(pos.covariance[0],pos.covariance[1]));
+		global_position.epv = sqrtf(pos.covariance[2]);
 
 		orb_publish_auto(ORB_ID(vehicle_global_position), &_global_pos_pub, &global_position, &_gpos_class_instance, ORB_PRIO_HIGH);
 

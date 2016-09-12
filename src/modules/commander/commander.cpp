@@ -167,8 +167,8 @@ static uint64_t last_print_mode_reject_time = 0;
 
 static systemlib::Hysteresis auto_disarm_hysteresis(false);
 
-static float eph_threshold = 5.0f;
-static float epv_threshold = 10.0f;
+static float eph_threshold = 2.0f;
+static float epv_threshold = 3.0f;
 
 static struct vehicle_status_s status = {};
 static struct vehicle_roi_s _roi = {};
@@ -2002,7 +2002,7 @@ int commander_thread_main(int argc, char *argv[])
 		bool global_eph_good;
 
 		if (status_flags.condition_global_position_valid) {
-			if (global_position.eph > eph_threshold * 2.5f) {
+			if (global_position.eph > eph_threshold * 1.5f) {
 				global_eph_good = false;
 
 			} else {
@@ -2023,7 +2023,7 @@ int commander_thread_main(int argc, char *argv[])
 		bool local_eph_good;
 
 		if (status_flags.condition_local_position_valid) {
-			if (local_position.eph > eph_threshold * 2.5f) {
+			if (local_position.eph > eph_threshold * 1.5f) {
 				local_eph_good = false;
 
 			} else {

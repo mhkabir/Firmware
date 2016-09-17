@@ -1337,6 +1337,16 @@ MulticopterPositionControl::task_main()
 			_vel_err_d(0) = _vel_x_deriv.update(-_vel(0));
 			_vel_err_d(1) = _vel_y_deriv.update(-_vel(1));
 			_vel_err_d(2) = _vel_z_deriv.update(-_vel(2));
+			
+			if (_control_mode.flag_control_manual_enabled) {
+				_reset_alt_sp = _local_pos.reset_alt_sp;
+				reset_alt_sp();
+				_reset_pos_sp = _local_pos.reset_pos_sp;
+				reset_pos_sp();
+				if(_local_pos.reset_alt_sp || _local_pos.reset_pos_sp) {
+					mavlink_log_info(&_mavlink_log_pub, "[mpc] Setpoint reset by estimator");
+				}
+			}
 		}
 
 		// reset the horizontal and vertical position hold flags for non-manual modes

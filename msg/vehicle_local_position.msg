@@ -7,6 +7,9 @@ bool z_valid				# true if z is valid
 bool v_xy_valid				# true if vy and vy are valid
 bool v_z_valid				# true if vz is valid
 
+bool reset_alt_sp			# true if altitude setpoint should be reset
+bool reset_pos_sp			# true if position setpoint should be reset
+
 # Position in local NED frame
 float32 x				# North position in NED earth-fixed frame, (metres)
 float32 y				# East position in NED earth-fixed frame, (metres)

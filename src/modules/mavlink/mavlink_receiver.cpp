@@ -1063,6 +1063,10 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	local_position.z_valid = true;
 	local_position.v_xy_valid = true;
 	local_position.v_z_valid = true;
+	
+	// this is a hack :)
+	local_position.reset_alt_sp = (pos.covariance[6] > 0) ? true : false;
+	local_position.reset_pos_sp = (pos.covariance[6] > 0) ? true : false;
 
 	local_position.x = pos.x;
 	local_position.y = pos.y;

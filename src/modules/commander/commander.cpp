@@ -167,8 +167,8 @@ static uint64_t last_print_mode_reject_time = 0;
 
 static systemlib::Hysteresis auto_disarm_hysteresis(false);
 
-static float eph_threshold = 2.0f;
-static float epv_threshold = 3.0f;
+static float eph_threshold = 1.0f;
+static float epv_threshold = 1.0f;
 
 static struct vehicle_status_s status = {};
 static struct vehicle_roi_s _roi = {};

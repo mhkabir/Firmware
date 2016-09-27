@@ -90,7 +90,7 @@ Battery::updateBatteryStatus(hrt_abstime timestamp, float voltage_v, float curre
 	estimateRemaining(voltage_v, throttle_normalized, armed);
 	determineWarning();
 
-	if (_voltage_filtered_v > 2.1f) {
+	if (_voltage_filtered_v > 9.5f) {
 		battery_status->voltage_v = voltage_v;
 		battery_status->voltage_filtered_v = _voltage_filtered_v;
 		battery_status->current_a = current_a;

@@ -1375,6 +1375,13 @@ MulticopterPositionControl::task_main()
 			/* select control source */
 			if (_control_mode.flag_control_manual_enabled) {
 				/* manual control */
+				_reset_alt_sp = _local_pos.reset_alt_sp;
+				reset_alt_sp();
+				_reset_pos_sp = _local_pos.reset_pos_sp;
+				reset_pos_sp();
+				if(_local_pos.reset_alt_sp || _local_pos.reset_pos_sp) {
+					mavlink_log_info(&_mavlink_log_pub, "[mpc] Setpoint reset by estimator");
+				}
 				control_manual(dt);
 				_mode_auto = false;
 

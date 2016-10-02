@@ -151,7 +151,8 @@ private:
 	bool		_acc_comp = false;
 	float		_bias_max = 0.0f;
 	int		_ext_hdg_mode = 0;
-	int 	_airspeed_mode = 0;
+	int 		_airspeed_mode = 0;
+	bool		_vision_mag_fusion_enabled = false;
 
 	Vector<3>	_gyro;
 	Vector<3>	_accel;
@@ -425,6 +426,13 @@ void AttitudeEstimatorQ::task_main()
 				/* set magnetic declination automatically */
 				update_mag_declination(math::radians(get_mag_declination(_gpos.lat, _gpos.lon)));
 			}
+			
+			if(_gpos.eph < 5.0f && hrt_elapsed_time(&_gpos.timestamp) < 1000000) {
+				// only fuse magnetometer if we are outdoors
+				_vision_mag_fusion_enabled = true;
+			} else {
+				_vision_mag_fusion_enabled = false;
+			}
 		}
 
 		if (_acc_comp && _gpos.timestamp != 0 && hrt_absolute_time() < _gpos.timestamp + 20000 && _gpos.eph < 5.0f && _inited) {
@@ -683,7 +691,7 @@ bool AttitudeEstimatorQ::update(float dt)
 		}
 	}
 
-	if (_ext_hdg_mode == 0  || !_ext_hdg_good) {
+	if (_ext_hdg_mode == 0  || !_ext_hdg_good || (_vision_mag_fusion_enabled && _ext_hdg_mode == 3)) {
 		// Magnetometer correction
 		// Project mag field vector to global frame and extract XY component
 		Vector<3> mag_earth = _q.conjugate(_mag);

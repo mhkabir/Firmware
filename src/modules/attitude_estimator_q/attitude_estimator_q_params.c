@@ -110,8 +110,9 @@ PARAM_DEFINE_INT32(ATT_MAG_DECL_A, 1);
  * @value 0 None
  * @value 1 Vision
  * @value 2 Motion Capture
+ * @value 3 Vision-mag fusion
  * @min 0
- * @max 2
+ * @max 3
  */
 PARAM_DEFINE_INT32(ATT_EXT_HDG_M, 0);
 

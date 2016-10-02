@@ -78,6 +78,8 @@
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/gps_inject_data.h>
 
+#include <mathlib/math/filter/LowPassFilter2p.hpp>
+
 #include "mavlink_ftp.h"
 
 #define PX4_EPOCH_SECS 1234567890ULL
@@ -226,13 +228,13 @@ private:
 	int _control_mode_sub;
 	int _hil_frames;
 	uint64_t _old_timestamp;
+	uint64_t _ref_timestamp;
 	uint64_t _hil_last_frame;
 	bool _hil_local_proj_inited;
 	float _hil_local_alt0;
 	float _hil_prev_gyro[3];
 	float _hil_prev_accel[3];
 	struct map_projection_reference_s _hil_local_proj_ref;
-	uint64_t _ref_timestamp;
 	struct offboard_control_mode_s _offboard_control_mode;
 	struct vehicle_attitude_setpoint_s _att_sp;
 	struct vehicle_rates_setpoint_s _rates_sp;
@@ -242,6 +244,13 @@ private:
 	int	_lpos_class_instance;
 	int	_gpos_class_instance;
 	int	_att_class_instance;
+	
+	math::LowPassFilter2p _lp_pos_x;
+	math::LowPassFilter2p _lp_pos_y;
+	math::LowPassFilter2p _lp_pos_z;
+	math::LowPassFilter2p _lp_vel_x;
+	math::LowPassFilter2p _lp_vel_y;
+	math::LowPassFilter2p _lp_vel_z;
 
 	static constexpr unsigned MOM_SWITCH_COUNT = 8;
 

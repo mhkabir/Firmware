@@ -1629,8 +1629,9 @@ protected:
 		struct vehicle_local_position_s pos;
 
 		if (_pos_sub->update(&_pos_time, &pos)) {
+			/*
 			mavlink_local_position_ned_t msg;
-
+			
 			msg.time_boot_ms = pos.timestamp / 1000;
 			msg.x = pos.x;
 			msg.y = pos.y;
@@ -1639,7 +1640,25 @@ protected:
 			msg.vy = pos.vy;
 			msg.vz = pos.vz;
 
-			mavlink_msg_local_position_ned_send_struct(_mavlink->get_channel(), &msg);
+			mavlink_msg_local_position_ned_send_struct(_mavlink->get_channel(), &msg); */
+			
+			// Debugging msg1
+			mavlink_vision_position_estimate_t vmsg;
+			vmsg.usec = pos.timestamp;
+			vmsg.x = pos.x;
+			vmsg.y = pos.y;
+			vmsg.z = pos.z;
+
+			mavlink_msg_vision_position_estimate_send_struct(_mavlink->get_channel(), &vmsg);
+			
+			// Debugging msg2
+			mavlink_vision_speed_estimate_t vsmsg;
+			vsmsg.usec = pos.timestamp;
+			vsmsg.x = pos.vx;
+			vsmsg.y = pos.vy;
+			vsmsg.z = pos.vz;
+
+			mavlink_msg_vision_speed_estimate_send_struct(_mavlink->get_channel(), &vsmsg);
 		}
 	}
 };

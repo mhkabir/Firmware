@@ -130,6 +130,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_hil_frames(0),
 	_old_timestamp(0),
+	_ref_timestamp(0),
 	_hil_last_frame(0),
 	_hil_local_proj_inited(0),
 	_hil_local_alt0(0.0f),
@@ -145,6 +146,12 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_lpos_class_instance(-1),
 	_gpos_class_instance(-1),
 	_att_class_instance(-1),
+	_lp_pos_x(100.0f, 5.0f),
+	_lp_pos_y(100.0f, 5.0f),
+	_lp_pos_z(100.0f, 5.0f),
+	_lp_vel_x(100.0f, 5.0f),
+	_lp_vel_y(100.0f, 5.0f),
+	_lp_vel_z(100.0f, 5.0f),
 	_mom_switch_pos{},
 	_mom_switch_state(0)
 {
@@ -1022,6 +1029,7 @@ MavlinkReceiver::handle_message_gps_global_origin(mavlink_message_t *msg)
 		/* set reference for global coordinates <--> local coordiantes conversion and map_projection */
 		globallocalconverter_init((double)origin.latitude * 1.0e-7, (double)origin.longitude * 1.0e-7,
 					  (float)origin.altitude * 1.0e-3f, hrt_absolute_time());
+		_ref_timestamp = hrt_absolute_time();
 	}
 }
 
@@ -1058,23 +1066,18 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	
 	local_position.estimator_type = pos.estimator_type;
 	
-	// Better fault detection TODO
 	local_position.xy_valid = true;
 	local_position.z_valid = true;
 	local_position.v_xy_valid = true;
 	local_position.v_z_valid = true;
-	
-	// this is a hack :)
-	local_position.reset_alt_sp = (pos.covariance[6] > 0.5f) ? true : false;
-	local_position.reset_pos_sp = (pos.covariance[6] > 0.5f) ? true : false;
 
-	local_position.x = pos.x;
-	local_position.y = pos.y;
-	local_position.z = pos.z;
+	local_position.x = _lp_pos_x.apply(pos.x);
+	local_position.y = _lp_pos_y.apply(pos.y);
+	local_position.z = _lp_pos_z.apply(pos.z);
 
-	local_position.vx = pos.vx;
-	local_position.vy = pos.vy;
-	local_position.vz = pos.vz;
+	local_position.vx = _lp_vel_x.apply(pos.vx);
+	local_position.vy = _lp_vel_y.apply(pos.vy);
+	local_position.vz = _lp_vel_z.apply(pos.vz);
 	
 	local_position.ax = pos.ax;
 	local_position.ay = pos.ay;
@@ -1083,7 +1086,6 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 	local_position.xy_global = globallocalconverter_initialized();
 	local_position.z_global = globallocalconverter_initialized();
 	
-	// TODO yaw and rest of the crap
 	local_position.eph = sqrtf(fmaxf(pos.covariance[0],pos.covariance[1]));
 	local_position.epv = sqrtf(pos.covariance[2]);
 	
@@ -1106,8 +1108,8 @@ MavlinkReceiver::handle_message_local_position_ned_cov(mavlink_message_t *msg)
 		global_position.vel_e = pos.vy;
 		global_position.vel_d = pos.vz;
 		
-		global_position.eph = sqrtf(fmaxf(pos.covariance[0],pos.covariance[1]));
-		global_position.epv = sqrtf(pos.covariance[2]);
+		global_position.eph = local_position.eph;
+		global_position.epv = local_position.epv;
 
 		orb_publish_auto(ORB_ID(vehicle_global_position), &_global_pos_pub, &global_position, &_gpos_class_instance, ORB_PRIO_HIGH);
 

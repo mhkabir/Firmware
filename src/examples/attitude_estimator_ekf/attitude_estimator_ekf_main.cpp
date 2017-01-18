@@ -256,8 +256,9 @@ int attitude_estimator_ekf_thread_main(int argc, char *argv[])
 	memset(&raw, 0, sizeof(raw));
 	struct vehicle_gps_position_s gps;
 	memset(&gps, 0, sizeof(gps));
-	gps.eph = 100000;
-	gps.epv = 100000;
+	gps.pos_acc_n = 100000;
+	gps.pos_acc_e = 100000;
+	gps.pos_acc_d = 100000;
 	struct vehicle_global_position_s global_pos;
 	memset(&global_pos, 0, sizeof(global_pos));
 	struct vehicle_attitude_s att;
@@ -381,7 +382,7 @@ int attitude_estimator_ekf_thread_main(int argc, char *argv[])
 				if (gps_updated) {
 					orb_copy(ORB_ID(vehicle_gps_position), sub_gps, &gps);
 
-					if (gps.eph < 20.0f && hrt_elapsed_time(&gps.timestamp) < 1000000) {
+					if (math::max(gps.pos_acc_n, gps.pos_acc_e) < 20.0f && hrt_elapsed_time(&gps.timestamp) < 1000000) {
 						mag_decl = math::radians(get_mag_declination(gps.lat / 1e7f, gps.lon / 1e7f));
 
 						/* update mag declination rotation matrix */
@@ -440,7 +441,7 @@ int attitude_estimator_ekf_thread_main(int argc, char *argv[])
 
 					hrt_abstime vel_t = 0;
 					bool vel_valid = false;
-					if (gps.eph < 5.0f && global_pos.timestamp != 0 && hrt_absolute_time() < global_pos.timestamp + 20000) {
+					if (math::max(gps.pos_acc_n, gps.pos_acc_e) < 5.0f && global_pos.timestamp != 0 && hrt_absolute_time() < global_pos.timestamp + 20000) {
 						vel_valid = true;
 						if (global_pos_updated) {
 							vel_t = global_pos.timestamp;
@@ -537,7 +538,7 @@ int attitude_estimator_ekf_thread_main(int argc, char *argv[])
 						parameters_update(&ekf_param_handles, &ekf_params);
 
 						/* update mag declination rotation matrix */
-						if (gps.eph < 20.0f && hrt_elapsed_time(&gps.timestamp) < 1000000) {
+						if (math::max(gps.pos_acc_n, gps.pos_acc_e) < 20.0f && hrt_elapsed_time(&gps.timestamp) < 1000000) {
 							mag_decl = math::radians(get_mag_declination(gps.lat / 1e7f, gps.lon / 1e7f));
 
 						}

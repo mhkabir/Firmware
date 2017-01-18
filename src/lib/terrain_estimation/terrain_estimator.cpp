@@ -157,7 +157,7 @@ void TerrainEstimator::measurement_update(uint64_t time_ref, const struct vehicl
 		float R = 0.056f;
 
 		matrix::Vector<float, 1> y;
-		y(0) = gps->vel_d_m_s;
+		y(0) = gps->vel_d;
 
 		// residual
 		matrix::Matrix<float, 1, 1> S_I = (C * _P * C.transpose());

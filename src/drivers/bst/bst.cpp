@@ -326,14 +326,16 @@ void BST::cycle()
 			vehicle_gps_position_s gps;
 			orb_copy(ORB_ID(vehicle_gps_position), _gps_sub, &gps);
 
-			if (gps.fix_type >= 3 && gps.eph < 50.0f) {
+			if ((gps.fix_type >= 3) && (fmaxf(gps.pos_acc_n, gps.pos_acc_e) < 50.0f)) {
 				BSTPacket<BSTGPSPosition> bst_gps = {};
 				bst_gps.type = 0x02;
 				bst_gps.payload.lat = swap_int32(gps.lat);
 				bst_gps.payload.lon = swap_int32(gps.lon);
 				bst_gps.payload.alt = swap_int16(gps.alt / 1000 + 1000);
-				bst_gps.payload.gs = swap_int16(gps.vel_m_s * 360.0f);
-				bst_gps.payload.heading = swap_int16(gps.cog_rad * 18000.0f / M_PI_F);
+				bst_gps.payload.gs = swap_int16(sqrtf(gps.vel_n * gps.vel_n
+								      + gps.vel_e * gps.vel_e
+								      + gps.vel_d * gps.vel_d) * 360.0f);
+				bst_gps.payload.heading = swap_int16(gps.cog * 18000.0f / M_PI_F);
 				bst_gps.payload.sats = gps.satellites_used;
 				send_packet(bst_gps);
 			}

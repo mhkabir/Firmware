@@ -278,13 +278,13 @@ GPSSIM::receive(int timeout)
 	_report_gps_pos.lat = gps.lat;
 	_report_gps_pos.lon = gps.lon;
 	_report_gps_pos.alt = gps.alt;
-	_report_gps_pos.eph = (float)gps.eph * 1e-2f;
-	_report_gps_pos.epv = (float)gps.epv * 1e-2f;
-	_report_gps_pos.vel_m_s = (float)(gps.vel) / 100.0f;
-	_report_gps_pos.vel_n_m_s = (float)(gps.vn) / 100.0f;
-	_report_gps_pos.vel_e_m_s = (float)(gps.ve) / 100.0f;
-	_report_gps_pos.vel_d_m_s = (float)(gps.vd) / 100.0f;
-	_report_gps_pos.cog_rad = (float)(gps.cog) * 3.1415f / (100.0f * 180.0f);
+	_report_gps_pos.pos_acc_n = (float)gps.eph * 1e-2f;
+	_report_gps_pos.pos_acc_e = (float)gps.eph * 1e-2f;
+	_report_gps_pos.pos_acc_d = (float)gps.epv * 1e-2f;
+	_report_gps_pos.vel_n = (float)(gps.vn) / 100.0f;
+	_report_gps_pos.vel_e = (float)(gps.ve) / 100.0f;
+	_report_gps_pos.vel_d = (float)(gps.vd) / 100.0f;
+	_report_gps_pos.cog = (float)(gps.cog) * 3.1415f / (100.0f * 180.0f);
 	_report_gps_pos.fix_type = gps.fix_type;
 	_report_gps_pos.satellites_used = gps.satellites_visible;
 
@@ -304,18 +304,23 @@ GPSSIM::task_main()
 			_report_gps_pos.lat = (int32_t)47.378301e7f;
 			_report_gps_pos.lon = (int32_t)8.538777e7f;
 			_report_gps_pos.alt = (int32_t)1200e3f;
-			_report_gps_pos.s_variance_m_s = 10.0f;
-			_report_gps_pos.c_variance_rad = 0.1f;
+			_report_gps_pos.alt_ellipsoid = 10000;
 			_report_gps_pos.fix_type = 3;
-			_report_gps_pos.eph = 0.9f;
-			_report_gps_pos.epv = 1.8f;
-			_report_gps_pos.vel_n_m_s = 0.0f;
-			_report_gps_pos.vel_e_m_s = 0.0f;
-			_report_gps_pos.vel_d_m_s = 0.0f;
-			_report_gps_pos.vel_m_s = sqrtf(_report_gps_pos.vel_n_m_s * _report_gps_pos.vel_n_m_s + _report_gps_pos.vel_e_m_s *
-							_report_gps_pos.vel_e_m_s + _report_gps_pos.vel_d_m_s * _report_gps_pos.vel_d_m_s);
-			_report_gps_pos.cog_rad = 0.0f;
+			_report_gps_pos.vel_n = 0.0f;
+			_report_gps_pos.vel_e = 0.0f;
+			_report_gps_pos.vel_d = 0.0f;
+			_report_gps_pos.cog = 0.0f;
+			_report_gps_pos.pos_acc_n = 0.8f;
+			_report_gps_pos.pos_acc_e = 0.8f;
+			_report_gps_pos.pos_acc_d = 1.2f;
+			_report_gps_pos.vel_acc_n = 0.5f;
+			_report_gps_pos.vel_acc_e = 0.5f;
+			_report_gps_pos.vel_acc_d = 0.5f;
+			_report_gps_pos.cog_acc = 0.1f;
+			_report_gps_pos.hdop = 0.9f;
+			_report_gps_pos.vdop = 0.9f;
 			_report_gps_pos.vel_ned_valid = true;
+			_report_gps_pos.satellites_used = 10;
 
 			//no time and satellite information simulated
 
@@ -407,9 +412,10 @@ GPSSIM::print_info()
 		PX4_INFO("position lock: %dD, satellites: %d, last update: %8.4fms ago", (int)_report_gps_pos.fix_type,
 			 _report_gps_pos.satellites_used, (double)(hrt_absolute_time() - _report_gps_pos.timestamp) / 1000.0);
 		PX4_INFO("lat: %d, lon: %d, alt: %d", _report_gps_pos.lat, _report_gps_pos.lon, _report_gps_pos.alt);
-		PX4_INFO("vel: %.2fm/s, %.2fm/s, %.2fm/s", (double)_report_gps_pos.vel_n_m_s,
-			 (double)_report_gps_pos.vel_e_m_s, (double)_report_gps_pos.vel_d_m_s);
-		PX4_INFO("eph: %.2fm, epv: %.2fm", (double)_report_gps_pos.eph, (double)_report_gps_pos.epv);
+		PX4_INFO("vel: %.2fm/s, %.2fm/s, %.2fm/s", (double)_report_gps_pos.vel_n,
+			 (double)_report_gps_pos.vel_e, (double)_report_gps_pos.vel_d);
+		PX4_INFO("eph: %.2fm, epv: %.2fm", (double)fmaxf(_report_gps_pos.pos_acc_n, _report_gps_pos.pos_acc_e),
+			 (double)_report_gps_pos.pos_acc_d);
 		//PX4_INFO("rate position: \t%6.2f Hz", (double)_Helper->get_position_update_rate());
 		//PX4_INFO("rate velocity: \t%6.2f Hz", (double)_Helper->get_velocity_update_rate());
 		PX4_INFO("rate publication:\t%6.2f Hz", (double)_rate);

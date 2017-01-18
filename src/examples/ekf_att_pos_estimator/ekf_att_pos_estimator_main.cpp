@@ -251,8 +251,9 @@ AttitudePositionEstimatorEKF::AttitudePositionEstimatorEKF() :
 	_parameter_handles.airspeed_mode = param_find("FW_AIRSPD_MODE");
 
 	/* indicate consumers that the current position data is not valid */
-	_gps.eph = 10000.0f;
-	_gps.epv = 10000.0f;
+	_gps.pos_acc_n = 10000.0f;
+	_gps.pos_acc_e = 10000.0f;
+	_gps.pos_acc_d = 10000.0f;
 
 	/* fetch initial parameter values */
 	parameters_update();
@@ -560,9 +561,9 @@ void AttitudePositionEstimatorEKF::task_main()
 	fds[1].fd = _sensor_combined_sub;
 	fds[1].events = POLLIN;
 
-	_gps.vel_n_m_s = 0.0f;
-	_gps.vel_e_m_s = 0.0f;
-	_gps.vel_d_m_s = 0.0f;
+	_gps.vel_n = 0.0f;
+	_gps.vel_e = 0.0f;
+	_gps.vel_d = 0.0f;
 
 	_task_running = true;
 
@@ -797,9 +798,9 @@ void AttitudePositionEstimatorEKF::initializeGPS()
 	float declination = math::radians(get_mag_declination(lat, lon));
 
 	float initVelNED[3];
-	initVelNED[0] = _gps.vel_n_m_s;
-	initVelNED[1] = _gps.vel_e_m_s;
-	initVelNED[2] = _gps.vel_d_m_s;
+	initVelNED[0] = _gps.vel_n;
+	initVelNED[1] = _gps.vel_e;
+	initVelNED[2] = _gps.vel_d;
 
 	_ekf->InitialiseFilter(initVelNED, math::radians(lat), math::radians(lon) - M_PI, gps_alt, declination);
 
@@ -1037,8 +1038,8 @@ void AttitudePositionEstimatorEKF::publishGlobalPosition()
 		_global_pos.epv = EPV_LARGE_VALUE;
 
 	} else {
-		_global_pos.eph = _gps.eph;
-		_global_pos.epv = _gps.epv;
+		_global_pos.eph = math::max(_gps.pos_acc_n, _gps.pos_acc_e);
+		_global_pos.epv = _gps.pos_acc_d;
 	}
 
 	if (!PX4_ISFINITE(_global_pos.lat) ||
@@ -1443,7 +1444,7 @@ void AttitudePositionEstimatorEKF::pollData()
 		}
 
 		//Check if the GPS fix is good enough for us to use
-		if ((_gps.fix_type >= 3) && (_gps.eph < requiredAccuracy) && (_gps.epv < requiredAccuracy)) {
+		if ((_gps.fix_type >= 3) && (math::max(_gps.pos_acc_n, _gps.pos_acc_e) < requiredAccuracy) && (_gps.pos_acc_d < requiredAccuracy)) {
 			_gpsIsGood = true;
 
 		} else {
@@ -1464,9 +1465,9 @@ void AttitudePositionEstimatorEKF::pollData()
 
 			//Fetch new GPS data
 			_ekf->GPSstatus = _gps.fix_type;
-			_ekf->velNED[0] = _gps.vel_n_m_s;
-			_ekf->velNED[1] = _gps.vel_e_m_s;
-			_ekf->velNED[2] = _gps.vel_d_m_s;
+			_ekf->velNED[0] = _gps.vel_n;
+			_ekf->velNED[1] = _gps.vel_e;
+			_ekf->velNED[2] = _gps.vel_d;
 
 			_ekf->gpsLat = math::radians(_gps.lat / (double)1e7);
 			_ekf->gpsLon = math::radians(_gps.lon / (double)1e7) - M_PI;

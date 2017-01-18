@@ -119,22 +119,25 @@ void UavcanGnssBridge::gnss_fix_sub_cb(const uavcan::ReceivedDataStructure<uavca
 		float pos_cov[9];
 		msg.position_covariance.unpackSquareMatrix(pos_cov);
 
-		// Horizontal position uncertainty
-		const float horizontal_pos_variance = math::max(pos_cov[0], pos_cov[4]);
-		report.eph = (horizontal_pos_variance > 0) ? sqrtf(horizontal_pos_variance) : -1.0F;
-
-		// Vertical position uncertainty
-		report.epv = (pos_cov[8] > 0) ? sqrtf(pos_cov[8]) : -1.0F;
+		// Position uncertainty
+		report.pos_acc_n = (pos_cov[0] > 0) ? sqrtf(pos_cov[0]) : -1.0F;
+		report.pos_acc_e = (pos_cov[4] > 0) ? sqrtf(pos_cov[4]) : -1.0F;
+		report.pos_acc_d = (pos_cov[8] > 0) ? sqrtf(pos_cov[8]) : -1.0F;
 
 	} else {
-		report.eph = -1.0F;
-		report.epv = -1.0F;
+		report.pos_acc_n = -1.0F;
+		report.pos_acc_e = -1.0F;
+		report.pos_acc_d = -1.0F;
 	}
 
 	if (valid_velocity_covariance) {
 		float vel_cov[9];
 		msg.velocity_covariance.unpackSquareMatrix(vel_cov);
-		report.s_variance_m_s = math::max(math::max(vel_cov[0], vel_cov[4]), vel_cov[8]);
+
+		// Velocity uncertainty
+		report.vel_acc_n = (vel_cov[0] > 0) ? sqrtf(vel_cov[0]) : -1.0F;
+		report.vel_acc_e = (vel_cov[4] > 0) ? sqrtf(vel_cov[4]) : -1.0F;
+		report.vel_acc_d = (vel_cov[8] > 0) ? sqrtf(vel_cov[8]) : -1.0F;
 
 		/* There is a nonlinear relationship between the velocity vector and the heading.
 		 * Use Jacobian to transform velocity covariance to heading covariance
@@ -150,24 +153,24 @@ void UavcanGnssBridge::gnss_fix_sub_cb(const uavcan::ReceivedDataStructure<uavca
 		float vel_e = msg.ned_velocity[1];
 		float vel_n_sq = vel_n * vel_n;
 		float vel_e_sq = vel_e * vel_e;
-		report.c_variance_rad =
+		report.cog_acc = sqrtf(
 			(vel_e_sq * vel_cov[0] +
 			 -2 * vel_n * vel_e * vel_cov[1] +	// Covariance matrix is symmetric
-			 vel_n_sq * vel_cov[4]) / ((vel_n_sq + vel_e_sq) * (vel_n_sq + vel_e_sq));
+			 vel_n_sq * vel_cov[4]) / ((vel_n_sq + vel_e_sq) * (vel_n_sq + vel_e_sq)));
 
 	} else {
-		report.s_variance_m_s = -1.0F;
-		report.c_variance_rad = -1.0F;
+		report.vel_acc_n = -1.0F;
+		report.vel_acc_e = -1.0F;
+		report.vel_acc_d = -1.0F;
+		report.cog_acc = -1.0F;
 	}
 
 	report.fix_type = msg.status;
 
-	report.vel_n_m_s = msg.ned_velocity[0];
-	report.vel_e_m_s = msg.ned_velocity[1];
-	report.vel_d_m_s = msg.ned_velocity[2];
-	report.vel_m_s = sqrtf(report.vel_n_m_s * report.vel_n_m_s + report.vel_e_m_s * report.vel_e_m_s + report.vel_d_m_s *
-			       report.vel_d_m_s);
-	report.cog_rad = atan2f(report.vel_e_m_s, report.vel_n_m_s);
+	report.vel_n = msg.ned_velocity[0];
+	report.vel_e = msg.ned_velocity[1];
+	report.vel_d = msg.ned_velocity[2];
+	report.cog = atan2f(report.vel_e, report.vel_n);
 	report.vel_ned_valid = true;
 
 	report.timestamp_time_relative = 0;

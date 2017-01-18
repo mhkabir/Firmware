@@ -1100,11 +1100,13 @@ protected:
 			msg.lat = gps.lat;
 			msg.lon = gps.lon;
 			msg.alt = gps.alt;
-			msg.eph = gps.hdop * 100; //cm_uint16_from_m_float(gps.eph);
-			msg.epv = gps.vdop * 100; //cm_uint16_from_m_float(gps.epv);
-			msg.vel = cm_uint16_from_m_float(gps.vel_m_s),
-			    msg.cog = _wrap_2pi(gps.cog_rad) * M_RAD_TO_DEG_F * 1e2f,
-				msg.satellites_visible = gps.satellites_used;
+			msg.eph = gps.hdop * 100; // The message spec was updated to use HDOP/VDOP,
+			msg.epv = gps.vdop * 100; // but the old field names kept for backward compatibility
+			msg.vel = cm_uint16_from_m_float(sqrtf(gps.vel_n * gps.vel_n
+							       + gps.vel_e * gps.vel_e
+							       + gps.vel_d * gps.vel_d)) ; // Ground speed
+			msg.cog = _wrap_2pi(gps.cog) * M_RAD_TO_DEG_F * 1e2f;
+			msg.satellites_visible = gps.satellites_used;
 
 			mavlink_msg_gps_raw_int_send_struct(_mavlink->get_channel(), &msg);
 		}

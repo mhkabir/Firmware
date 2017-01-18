@@ -1897,17 +1897,23 @@ MavlinkReceiver::handle_message_hil_gps(mavlink_message_t *msg)
 	hil_gps.lat = gps.lat;
 	hil_gps.lon = gps.lon;
 	hil_gps.alt = gps.alt;
-	hil_gps.eph = (float)gps.eph * 1e-2f; // from cm to m
-	hil_gps.epv = (float)gps.epv * 1e-2f; // from cm to m
 
-	hil_gps.s_variance_m_s = 1.0f;
-
-	hil_gps.vel_m_s = (float)gps.vel * 1e-2f; // from cm/s to m/s
-	hil_gps.vel_n_m_s = gps.vn * 1e-2f; // from cm to m
-	hil_gps.vel_e_m_s = gps.ve * 1e-2f; // from cm to m
-	hil_gps.vel_d_m_s = gps.vd * 1e-2f; // from cm to m
+	hil_gps.vel_n = gps.vn * 1e-2f; // from cm to m
+	hil_gps.vel_e = gps.ve * 1e-2f; // from cm to m
+	hil_gps.vel_d = gps.vd * 1e-2f; // from cm to m
 	hil_gps.vel_ned_valid = true;
-	hil_gps.cog_rad = _wrap_pi(gps.cog * M_DEG_TO_RAD_F * 1e-2f);
+
+	hil_gps.pos_acc_n = (float)gps.eph * 1e-2f; // from cm to m
+	hil_gps.pos_acc_e = (float)gps.eph * 1e-2f; // from cm to m
+	hil_gps.pos_acc_d = (float)gps.epv * 1e-2f; // from cm to m
+
+	hil_gps.vel_acc_n = 1.0f;
+	hil_gps.vel_acc_e = 1.0f;
+	hil_gps.vel_acc_d = 1.0f;
+
+	hil_gps.cog = _wrap_pi(gps.cog * M_DEG_TO_RAD_F * 1e-2f);
+
+	hil_gps.cog_acc = 1.0f;
 
 	hil_gps.fix_type = gps.fix_type;
 	hil_gps.satellites_used = gps.satellites_visible;  //TODO: rename mavlink_hil_gps_t sats visible to used?

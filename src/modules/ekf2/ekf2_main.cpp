@@ -602,13 +602,15 @@ void Ekf2::task_main()
 			gps_msg.lon = gps.lon;
 			gps_msg.alt = gps.alt;
 			gps_msg.fix_type = gps.fix_type;
-			gps_msg.eph = gps.eph;
-			gps_msg.epv = gps.epv;
-			gps_msg.sacc = gps.s_variance_m_s;
-			gps_msg.vel_m_s = gps.vel_m_s;
-			gps_msg.vel_ned[0] = gps.vel_n_m_s;
-			gps_msg.vel_ned[1] = gps.vel_e_m_s;
-			gps_msg.vel_ned[2] = gps.vel_d_m_s;
+			gps_msg.eph = math::max(gps.pos_acc_n, gps.pos_acc_e);
+			gps_msg.epv = gps.pos_acc_d;
+			gps_msg.sacc = math::max(math::max(gps.vel_acc_n, gps.vel_acc_e), gps.vel_acc_d);
+			gps_msg.vel_m_s = sqrtf(gps.vel_n * gps.vel_n
+						+ gps.vel_e * gps.vel_e
+						+ gps.vel_d * gps.vel_d); // TODO : why does the estimator even need this field?
+			gps_msg.vel_ned[0] = gps.vel_n;
+			gps_msg.vel_ned[1] = gps.vel_e;
+			gps_msg.vel_ned[2] = gps.vel_d;
 			gps_msg.vel_ned_valid = gps.vel_ned_valid;
 			gps_msg.nsats = gps.satellites_used;
 			//TODO add gdop to gps topic
@@ -1039,13 +1041,15 @@ void Ekf2::task_main()
 				replay.alt = gps.alt;
 				replay.fix_type = gps.fix_type;
 				replay.nsats = gps.satellites_used;
-				replay.eph = gps.eph;
-				replay.epv = gps.epv;
-				replay.sacc = gps.s_variance_m_s;
-				replay.vel_m_s = gps.vel_m_s;
-				replay.vel_n_m_s = gps.vel_n_m_s;
-				replay.vel_e_m_s = gps.vel_e_m_s;
-				replay.vel_d_m_s = gps.vel_d_m_s;
+				replay.eph = math::max(gps.pos_acc_n, gps.pos_acc_e);
+				replay.epv = gps.pos_acc_d;
+				replay.sacc = math::max(math::max(gps.vel_acc_n, gps.vel_acc_e), gps.vel_acc_d);
+				replay.vel_m_s = sqrtf(gps.vel_n * gps.vel_n
+						       + gps.vel_e * gps.vel_e
+						       + gps.vel_d * gps.vel_d); // TODO : why does the estimator even need this field?
+				replay.vel_n_m_s = gps.vel_n;
+				replay.vel_e_m_s = gps.vel_e;
+				replay.vel_d_m_s = gps.vel_d;
 				replay.vel_ned_valid = gps.vel_ned_valid;
 
 			} else {

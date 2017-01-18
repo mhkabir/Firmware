@@ -236,10 +236,12 @@ build_gps_response(uint8_t *buffer, size_t *size)
 	/* No point collecting more data if we don't have a 3D fix yet */
 	if (gps.fix_type > 2) {
 		/* Current flight direction */
-		msg.flight_direction = (uint8_t)(gps.cog_rad * M_RAD_TO_DEG_F);
+		msg.flight_direction = (uint8_t)(gps.cog * M_RAD_TO_DEG_F);
 
 		/* GPS speed */
-		uint16_t speed = (uint16_t)(gps.vel_m_s * 3.6f);
+		uint16_t speed = (uint16_t)(sqrtf(gps.vel_n * gps.vel_n
+						  + gps.vel_e * gps.vel_e
+						  + gps.vel_d * gps.vel_d) * 3.6f);
 		msg.gps_speed_L = (uint8_t)speed & 0xff;
 		msg.gps_speed_H = (uint8_t)(speed >> 8) & 0xff;
 

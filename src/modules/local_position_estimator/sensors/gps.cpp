@@ -13,8 +13,8 @@ void BlockLocalPositionEstimator::gpsInit()
 {
 	// check for good gps signal
 	uint8_t nSat = _sub_gps.get().satellites_used;
-	float eph = _sub_gps.get().eph;
-	float epv = _sub_gps.get().epv;
+	float eph = math::max(_sub_gps.get().pos_acc_n, _sub_gps.get().pos_acc_e);
+	float epv = _sub_gps.get().pos_acc_d;
 	uint8_t fix_type = _sub_gps.get().fix_type;
 
 	if (
@@ -89,9 +89,9 @@ int BlockLocalPositionEstimator::gpsMeasure(Vector<double, n_y_gps> &y)
 	y(0) = _sub_gps.get().lat * 1e-7;
 	y(1) = _sub_gps.get().lon * 1e-7;
 	y(2) = _sub_gps.get().alt * 1e-3;
-	y(3) = _sub_gps.get().vel_n_m_s;
-	y(4) = _sub_gps.get().vel_e_m_s;
-	y(5) = _sub_gps.get().vel_d_m_s;
+	y(3) = _sub_gps.get().vel_n;
+	y(4) = _sub_gps.get().vel_e;
+	y(5) = _sub_gps.get().vel_d;
 
 	// increament sums for mean
 	_gpsStats.update(y);
@@ -144,24 +144,23 @@ void BlockLocalPositionEstimator::gpsCorrect()
 	float var_vz = _gps_vz_stddev.get() * _gps_vz_stddev.get();
 
 	// if field is not below minimum, set it to the value provided
-	if (_sub_gps.get().eph > _gps_xy_stddev.get()) {
-		var_xy = _sub_gps.get().eph * _sub_gps.get().eph;
+	if (math::max(_sub_gps.get().pos_acc_n, _sub_gps.get().pos_acc_e) > _gps_xy_stddev.get()) {
+		var_xy = math::max(_sub_gps.get().pos_acc_n * _sub_gps.get().pos_acc_n,
+				   _sub_gps.get().pos_acc_e * _sub_gps.get().pos_acc_e);
 	}
 
-	if (_sub_gps.get().epv > _gps_z_stddev.get()) {
-		var_z = _sub_gps.get().epv * _sub_gps.get().epv;
+	if (_sub_gps.get().pos_acc_d > _gps_z_stddev.get()) {
+		var_z = _sub_gps.get().pos_acc_d * _sub_gps.get().pos_acc_d;
 	}
 
-	float gps_s_stddev =  _sub_gps.get().s_variance_m_s;
-
-	if (gps_s_stddev > _gps_vxy_stddev.get()) {
-		var_vxy = gps_s_stddev * gps_s_stddev;
+	if (math::max(_sub_gps.get().vel_acc_n, _sub_gps.get().vel_acc_e) > _gps_vxy_stddev.get()) {
+		var_vxy = math::max(_sub_gps.get().vel_acc_n * _sub_gps.get().vel_acc_n,
+				    _sub_gps.get().vel_acc_e * _sub_gps.get().vel_acc_e);
 	}
 
-	if (gps_s_stddev > _gps_vz_stddev.get()) {
-		var_vz = gps_s_stddev * gps_s_stddev;
+	if (_sub_gps.get().vel_acc_d > _gps_vz_stddev.get()) {
+		var_vz = _sub_gps.get().vel_acc_d * _sub_gps.get().vel_acc_d;
 	}
-
 
 	R(0, 0) = var_xy;
 	R(1, 1) = var_xy;

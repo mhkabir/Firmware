@@ -684,24 +684,24 @@ GPS::task_main()
 			_report_gps_pos.lon = (int32_t)8.538777e7f;
 			_report_gps_pos.alt = (int32_t)1200e3f;
 			_report_gps_pos.alt_ellipsoid = 10000;
-			_report_gps_pos.s_variance_m_s = 0.5f;
-			_report_gps_pos.c_variance_rad = 0.1f;
 			_report_gps_pos.fix_type = 3;
-			_report_gps_pos.eph = 0.8f;
-			_report_gps_pos.epv = 1.2f;
+			_report_gps_pos.vel_n = 0.0f;
+			_report_gps_pos.vel_e = 0.0f;
+			_report_gps_pos.vel_d = 0.0f;
+			_report_gps_pos.cog = 0.0f;
+			_report_gps_pos.pos_acc_n = 0.8f;
+			_report_gps_pos.pos_acc_e = 0.8f;
+			_report_gps_pos.pos_acc_d = 1.2f;
+			_report_gps_pos.vel_acc_n = 0.5f;
+			_report_gps_pos.vel_acc_e = 0.5f;
+			_report_gps_pos.vel_acc_d = 0.5f;
+			_report_gps_pos.cog_acc = 0.1f;
 			_report_gps_pos.hdop = 0.9f;
 			_report_gps_pos.vdop = 0.9f;
-			_report_gps_pos.vel_n_m_s = 0.0f;
-			_report_gps_pos.vel_e_m_s = 0.0f;
-			_report_gps_pos.vel_d_m_s = 0.0f;
-			_report_gps_pos.vel_m_s = sqrtf(_report_gps_pos.vel_n_m_s * _report_gps_pos.vel_n_m_s + _report_gps_pos.vel_e_m_s *
-							_report_gps_pos.vel_e_m_s + _report_gps_pos.vel_d_m_s * _report_gps_pos.vel_d_m_s);
-			_report_gps_pos.cog_rad = 0.0f;
 			_report_gps_pos.vel_ned_valid = true;
 			_report_gps_pos.satellites_used = 10;
 
 			/* no time and satellite information simulated */
-
 
 			publish();
 
@@ -757,8 +757,9 @@ GPS::task_main()
 					_report_gps_pos.timestamp_time_relative = 0;
 
 					/* set a massive variance */
-					_report_gps_pos.eph = 10000.0f;
-					_report_gps_pos.epv = 10000.0f;
+					_report_gps_pos.pos_acc_n = 1000.0f;
+					_report_gps_pos.pos_acc_e = 1000.0f;
+					_report_gps_pos.pos_acc_d = 1000.0f;
 					_report_gps_pos.fix_type = 0;
 
 					publish();
@@ -920,10 +921,11 @@ GPS::print_info()
 		PX4_WARN("position lock: %d, satellites: %d, last update: %8.4fms ago", (int)_report_gps_pos.fix_type,
 			 _report_gps_pos.satellites_used, (double)(hrt_absolute_time() - _report_gps_pos.timestamp) / 1000.0);
 		PX4_WARN("lat: %d, lon: %d, alt: %d", _report_gps_pos.lat, _report_gps_pos.lon, _report_gps_pos.alt);
-		PX4_WARN("vel: %.2fm/s, %.2fm/s, %.2fm/s", (double)_report_gps_pos.vel_n_m_s,
-			 (double)_report_gps_pos.vel_e_m_s, (double)_report_gps_pos.vel_d_m_s);
+		PX4_WARN("vel: %.2fm/s, %.2fm/s, %.2fm/s", (double)_report_gps_pos.vel_n,
+			 (double)_report_gps_pos.vel_e, (double)_report_gps_pos.vel_d);
 		PX4_WARN("hdop: %.2f, vdop: %.2f", (double)_report_gps_pos.hdop, (double)_report_gps_pos.vdop);
-		PX4_WARN("eph: %.2fm, epv: %.2fm", (double)_report_gps_pos.eph, (double)_report_gps_pos.epv);
+		PX4_WARN("eph: %.2fm, epv: %.2fm", (double)math::max(_report_gps_pos.pos_acc_n, _report_gps_pos.pos_acc_e),
+			 (double)_report_gps_pos.pos_acc_d);
 		PX4_WARN("rate position: \t\t%6.2f Hz", (double)_helper->getPositionUpdateRate());
 		PX4_WARN("rate velocity: \t\t%6.2f Hz", (double)_helper->getVelocityUpdateRate());
 		PX4_WARN("rate publication:\t\t%6.2f Hz", (double)_rate);

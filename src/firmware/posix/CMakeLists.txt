@@ -101,6 +101,39 @@ elseif ("${BOARD}" STREQUAL "bebop")
 				DEPENDS ${APP_NAME}
 				DEST /usr/bin)
 
+elseif ("${BOARD}" STREQUAL "skycontroller")
+
+	set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -static")
+	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -static")
+
+	px4_add_executable(${APP_NAME}
+		${MAIN_SRC}
+		apps.cpp
+		)
+
+	if (NOT APPLE)
+		target_link_libraries(${APP_NAME}
+			-Wl,--start-group
+			${module_libraries}
+			${df_driver_libs}
+			pthread m rt
+			-Wl,--end-group
+			)
+	else()
+		target_link_libraries(${APP_NAME}
+			${module_libraries}
+			${df_driver_libs}
+			pthread m
+			)
+	endif()
+
+	px4_add_adb_push_to_skycontroller(OUT ${UPLOAD_NAME}
+				OS ${OS}
+				BOARD ${BOARD}
+				FILES ${CMAKE_CURRENT_BINARY_DIR}/${APP_NAME}
+				DEPENDS ${APP_NAME}
+				DEST /usr/bin)
+
 elseif ("${BOARD}" STREQUAL "sitl")
 
 	include(./sitl_target.cmake)

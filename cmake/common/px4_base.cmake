@@ -576,6 +576,24 @@ function(px4_add_adb_push_to_bebop)
 		)
 endfunction()
 
+function(px4_add_adb_push_to_skycontroller)
+	px4_parse_function_args(
+		NAME px4_add_upload_to_skycontroller
+		ONE_VALUE OS BOARD OUT DEST
+		MULTI_VALUE FILES DEPENDS
+		REQUIRED OS BOARD OUT FILES DEPENDS DEST
+		ARGN ${ARGN})
+
+	add_custom_target(${OUT}
+		COMMAND ${PX4_SOURCE_DIR}/Tools/adb_upload_to_skycontroller.sh ${FILES} ${DEST}
+		DEPENDS ${DEPENDS}
+		WORKING_DIRECTORY ${PX4_BINARY_DIR}
+		COMMENT "uploading ${BUNDLE}"
+		VERBATIM
+		USES_TERMINAL
+		)
+endfunction()
+
 function(px4_add_scp_push)
 	px4_parse_function_args(
 		NAME px4_add_upload

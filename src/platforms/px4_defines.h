@@ -196,6 +196,8 @@ __END_DECLS
 #    define PX4_ROOTFSDIR "/home/linaro"
 #  elif defined(__PX4_POSIX_BEBOP)
 #    define PX4_ROOTFSDIR "/data/ftp/internal_000"
+#  elif defined(__PX4_POSIX_SKYCONTROLLER)
+#    define PX4_ROOTFSDIR "/home/root"
 #  else
 #    define PX4_ROOTFSDIR "rootfs"
 #  endif

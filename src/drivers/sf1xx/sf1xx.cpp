@@ -77,7 +77,7 @@
 #include <board_config.h>
 
 /* Configuration Constants */
-#define SF1XX_BUS 		PX4_I2C_BUS_EXPANSION
+#define SF1XX_BUS 		PX4_I2C_BUS_ONBOARD
 #define SF1XX_BASEADDR 	0x66
 #define SF1XX_DEVICE_PATH	"/dev/sf1xx"
 

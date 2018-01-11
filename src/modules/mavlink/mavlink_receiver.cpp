@@ -139,6 +139,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_debug_vect_pub(nullptr),
 	_gps_inject_data_pub(nullptr),
 	_command_ack_pub(nullptr),
+	_landing_target_pub(nullptr),
 	_control_mode_sub(orb_subscribe(ORB_ID(vehicle_control_mode))),
 	_actuator_armed_sub(orb_subscribe(ORB_ID(actuator_armed))),
 	_global_ref_timestamp(0),
@@ -337,6 +338,11 @@ MavlinkReceiver::handle_message(mavlink_message_t *msg)
 	case MAVLINK_MSG_ID_DEBUG_VECT:
 		handle_message_debug_vect(msg);
 		break;
+
+	case MAVLINK_MSG_ID_LANDING_TARGET:
+		handle_message_landing_target(msg);
+		break;
+
 
 	default:
 		break;
@@ -2373,6 +2379,29 @@ void MavlinkReceiver::handle_message_debug_vect(mavlink_message_t *msg)
 
 	} else {
 		orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &debug_topic);
+	}
+}
+
+void
+MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
+{
+
+	mavlink_landing_target_t target;
+	mavlink_msg_landing_target_decode(msg, &target);
+
+	struct irlock_report_s report = {};
+
+	report.timestamp = sync_stamp(target.time_usec);
+	report.pos_x = tan(target.angle_x);
+	report.pos_y = tan(target.angle_y);
+	report.size_x = tan(target.size_x);
+	report.size_y = tan(target.size_y);
+
+	if (_landing_target_pub == nullptr) {
+		_landing_target_pub = orb_advertise(ORB_ID(irlock_report), &report);
+
+	} else {
+		orb_publish(ORB_ID(irlock_report), _landing_target_pub, &report);
 	}
 }
 

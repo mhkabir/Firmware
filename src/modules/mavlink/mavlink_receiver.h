@@ -77,6 +77,7 @@
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/collision_report.h>
+#include <uORB/topics/irlock_report.h>
 
 #include "mavlink_mission.h"
 #include "mavlink_parameters.h"
@@ -158,6 +159,7 @@ private:
 	void handle_message_named_value_float(mavlink_message_t *msg);
 	void handle_message_debug(mavlink_message_t *msg);
 	void handle_message_debug_vect(mavlink_message_t *msg);
+	void handle_message_landing_target(mavlink_message_t *msg);
 
 	void *receive_thread(void *arg);
 
@@ -247,6 +249,7 @@ private:
 	static const int _gps_inject_data_queue_size = 6;
 	orb_advert_t _gps_inject_data_pub;
 	orb_advert_t _command_ack_pub;
+	orb_advert_t _landing_target_pub;
 	int _control_mode_sub;
 	int _actuator_armed_sub;
 	uint64_t _global_ref_timestamp;

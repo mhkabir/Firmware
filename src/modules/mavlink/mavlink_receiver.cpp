@@ -148,7 +148,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_hil_local_alt0(0.0f),
 	_hil_local_proj_ref{},
 	_offboard_control_mode{},
-	_time_offset_avg_alpha(0.8),
+	_time_offset_avg_alpha(0.4),
 	_time_offset(0),
 	_orb_class_instance(-1),
 	_mom_switch_pos{},
@@ -1835,7 +1835,7 @@ MavlinkReceiver::handle_message_timesync(mavlink_message_t *msg)
 		int64_t offset_ns = (int64_t)(tsync.ts1 + now_ns - tsync.tc1 * 2) / 2 ;
 		int64_t dt = _time_offset - offset_ns;
 
-		if (dt > 10000000LL || dt < -10000000LL) { // 10 millisecond skew
+		if (dt > 1000000000LL || dt < -1000000000LL) { // 1 second skew
 			_time_offset = offset_ns;
 
 			// Provide a warning only if not syncing initially
@@ -1843,18 +1843,22 @@ MavlinkReceiver::handle_message_timesync(mavlink_message_t *msg)
 				PX4_ERR("[timesync] Hard setting offset.");
 			}
 
-		} else {
-			smooth_time_offset(offset_ns);
+		} else if (dt < 10000000LL && dt > -10000000LL) { // Use only short RTT observations
+			smooth_time_offset(offset_ns); // TODO : is dt even RTT
 		}
-	}
 
-	tsync_offset.offset_ns = _time_offset ;
+		tsync_offset.timestamp = hrt_absolute_time();
+		tsync_offset.observed_offset_ns = offset_ns;
+		tsync_offset.dt = dt;
+		tsync_offset.calculated_offset_ns = _time_offset ;
 
-	if (_time_offset_pub == nullptr) {
-		_time_offset_pub = orb_advertise(ORB_ID(time_offset), &tsync_offset);
+		if (_time_offset_pub == nullptr) {
+			_time_offset_pub = orb_advertise(ORB_ID(time_offset), &tsync_offset);
 
-	} else {
-		orb_publish(ORB_ID(time_offset), _time_offset_pub, &tsync_offset);
+		} else {
+			orb_publish(ORB_ID(time_offset), _time_offset_pub, &tsync_offset);
+		}
+		
 	}
 
 }

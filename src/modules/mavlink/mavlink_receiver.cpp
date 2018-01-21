@@ -148,7 +148,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_hil_local_alt0(0.0f),
 	_hil_local_proj_ref{},
 	_offboard_control_mode{},
-	_time_offset_avg_alpha(0.8),
+	_time_offset_avg_alpha(0.2),
 	_time_offset(0),
 	_orb_class_instance(-1),
 	_mom_switch_pos{},
@@ -1812,7 +1812,7 @@ MavlinkReceiver::handle_message_timesync(mavlink_message_t *msg)
 		int64_t offset_ns = (int64_t)(tsync.ts1 + now_ns - tsync.tc1 * 2) / 2 ;
 		int64_t dt = _time_offset - offset_ns;
 
-		if (dt > 10000000LL || dt < -10000000LL) { // 10 millisecond skew
+		if (dt > 1000000000LL || dt < -1000000000LL) { // 10 millisecond skew
 			_time_offset = offset_ns;
 
 			// Provide a warning only if not syncing initially

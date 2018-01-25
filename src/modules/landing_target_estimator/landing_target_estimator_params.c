@@ -132,3 +132,33 @@ PARAM_DEFINE_FLOAT(LTEST_SCALE_X, 1.0f);
  * @group Landing target Estimator
  */
 PARAM_DEFINE_FLOAT(LTEST_SCALE_Y, 1.0f);
+
+/**
+ * X position of landing camera focal point in body frame
+ *
+ * @unit m
+ * @decimal 3
+ *
+ * @group Landing target Estimator
+ */
+PARAM_DEFINE_FLOAT(LTEST_CAM_PX, 0.0f);
+
+/**
+ * Y position of landing camera focal point in body frame
+ *
+ * @unit m
+ * @decimal 3
+ *
+ * @group Landing target Estimator
+ */
+PARAM_DEFINE_FLOAT(LTEST_CAM_PY, 0.0f);
+
+/**
+ * Z position of landing camera focal point in body frame
+ *
+ * @unit m
+ * @decimal 3
+ *
+ * @group Landing target Estimator
+ */
+PARAM_DEFINE_FLOAT(LTEST_CAM_PZ, 0.0f);

@@ -126,6 +126,9 @@ private:
 		param_t mode;
 		param_t scale_x;
 		param_t scale_y;
+		param_t cam_pos_x;
+		param_t cam_pos_y;
+		param_t cam_pos_z;
 	} _paramHandle;
 
 	struct {
@@ -136,6 +139,9 @@ private:
 		TargetMode mode;
 		float scale_x;
 		float scale_y;
+		float cam_pos_x;
+		float cam_pos_y;
+		float cam_pos_z;
 	} _params;
 
 	int _vehicleLocalPositionSub;

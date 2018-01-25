@@ -71,6 +71,9 @@ LandingTargetEstimator::LandingTargetEstimator() :
 	_paramHandle.mode = param_find("LTEST_MODE");
 	_paramHandle.scale_x = param_find("LTEST_SCALE_X");
 	_paramHandle.scale_y = param_find("LTEST_SCALE_Y");
+	_paramHandle.cam_pos_x = param_find("LTEST_CAM_PX");
+	_paramHandle.cam_pos_y = param_find("LTEST_CAM_PY");
+	_paramHandle.cam_pos_z = param_find("LTEST_CAM_PZ");
 
 	// Initialize uORB topics.
 	_initialize_topics();
@@ -154,11 +157,19 @@ void LandingTargetEstimator::update()
 		return;
 	}
 
+	matrix::Vector<float, 3> camera_pos; // camera position in body frame
+	camera_pos(0) = _params.cam_pos_x; // forward
+	camera_pos(1) = _params.cam_pos_y; // right
+	camera_pos(2) = _params.cam_pos_z; // down
+
+	// rotate into navigation frame
+	camera_pos = _R_att * camera_pos;
+
 	float dist = _vehicleLocalPosition.dist_bottom;
 
-	// scale the ray s.t. the z component has length of dist
-	_rel_pos(0) = sensor_ray(0) / sensor_ray(2) * dist;
-	_rel_pos(1) = sensor_ray(1) / sensor_ray(2) * dist;
+	// scale the ray s.t. the z component has length of dist and compensate for camera position
+	_rel_pos(0) = (sensor_ray(0) / sensor_ray(2) * dist) + camera_pos(0);
+	_rel_pos(1) = (sensor_ray(1) / sensor_ray(2) * dist) + camera_pos(1);
 
 	if (!_estimator_initialized) {
 		PX4_INFO("Init");
@@ -322,6 +333,9 @@ void LandingTargetEstimator::_update_params()
 	_params.mode = (TargetMode)mode;
 	param_get(_paramHandle.scale_x, &_params.scale_x);
 	param_get(_paramHandle.scale_y, &_params.scale_y);
+	param_get(_paramHandle.cam_pos_x, &_params.cam_pos_x);
+	param_get(_paramHandle.cam_pos_y, &_params.cam_pos_y);
+	param_get(_paramHandle.cam_pos_z, &_params.cam_pos_z);
 }
 
 

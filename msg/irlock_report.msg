@@ -1,5 +1,7 @@
 # IRLOCK_REPORT message data
 
+int32 relative_timestamp_source
+
 uint16 signature
 
 # When looking along the optical axis of the camera, x points right, y points down, and z points along the optical axis.

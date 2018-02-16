@@ -2391,7 +2391,8 @@ MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
 
 	struct irlock_report_s report = {};
 
-	report.timestamp = sync_stamp(target.time_usec);
+	report.timestamp = hrt_absolute_time();
+	report.relative_timestamp_source = (int32_t)((int64_t)report.timestamp - (int64_t)sync_stamp(target.time_usec));
 	report.pos_x = tan(target.angle_x);
 	report.pos_y = tan(target.angle_y);
 	report.size_x = tan(target.size_x);

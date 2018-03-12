@@ -58,6 +58,7 @@ px4_add_module(
 		mavlink_shell.cpp
 		mavlink_stream.cpp
 		mavlink_ulog.cpp
+		mavlink_timesync.cpp
 	DEPENDS
 		platforms__common
 		git_mavlink_v2

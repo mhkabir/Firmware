@@ -43,8 +43,10 @@
 
 MavlinkTimesync::MavlinkTimesync(Mavlink *mavlink) :
 	_timesync_status_pub(nullptr),
-	_time_offset_avg_alpha(0.4),
+	_filter_alpha(1e-3),
+	_filter_beta(1e-4),
 	_time_offset(0),
+	_time_offset_deriv(1),  // TODO : units ??
 	_mavlink(mavlink)
 {
 }
@@ -68,7 +70,7 @@ MavlinkTimesync::handle_message(const mavlink_message_t *msg)
 
 			uint64_t now_ns = hrt_absolute_time() * 1000LL ;
 
-			if (tsync.tc1 == 0) {			// Message from remote system, timestamp and return it
+			if (tsync.tc1 == 0) {			// Message originating from remote system, timestamp and return it
 
 				mavlink_timesync_t rsync; // return timestamped sync message
 
@@ -79,33 +81,59 @@ MavlinkTimesync::handle_message(const mavlink_message_t *msg)
 
 				return;
 
-			} else if (tsync.tc1 > 0) {		// Message from this system, compute time offset from it
+			} else if (tsync.tc1 > 0) {		// Message originating from this system, compute time offset from it
 
+				// Calculate time offset between this system and the remote system, assuming RTT for
+				// the timesync packet is roughly equal both ways.
 				int64_t offset_ns = (int64_t)(tsync.ts1 + now_ns - tsync.tc1 * 2) / 2 ;
-				int64_t dt = _time_offset - offset_ns;
 
-				if (dt > 10000000LL || dt < -10000000LL) { // 10 millisecond skew
-					_time_offset = offset_ns;
+				// Calculate the time it took the timesync packet to bounce back to us from remote system (RTT)
+				uint32_t rtt_ns = now_ns - tsync.tc1;
 
-					// Provide a warning only if not syncing initially
-					if (_time_offset != 0) {
-						PX4_ERR("[timesync] Hard setting offset.");
+				//bool outlier = rtt_ns > 10000000LL;	// Round-trip-time longer than 10ms is not good for convergence
+
+				/*
+				if(!outlier && !_timesync_converged) {	// Before we have converged, only use low-RTT samples to build an estimate
+					_good_packet_count++;
+
+					// Calculate the difference between the current estimate of the offset and the observed offset
+					int64_t dt = _time_offset - offset_ns;
+
+					if (dt > 50000000LL || dt < -50000000LL) { // 50 millisecond skew
+						_time_offset = offset_ns;
+
+						// Provide a warning only if not syncing initially
+						if (_time_offset != 0) {
+							PX4_ERR("[timesync] Hard setting offset.");
+						}
+
+					} else {
+						smooth_time_offset(offset_ns);
 					}
 
 				} else {
-					smooth_time_offset(offset_ns);
+					_bad_packet_count++;
+					return;
+				}*/
+				if (rtt_ns < 50000000LL) {	// 50 ms
+					add_sample(offset_ns);
+				} else {
+					PX4_WARN("Dropping timesync sample - High RTT : %lu ns", rtt_ns);
 				}
-			}
 
-			// Publish status message
-			tsync_status.offset_ns = _time_offset ;
-			//tsync_status.rtt_ns = rtt_ns ;
+				// Publish status message
+				tsync_status.timestamp = hrt_absolute_time();
+				tsync_status.observed_offset = offset_ns;
+				tsync_status.estimated_offset = _time_offset;
+				tsync_status.round_trip_time = rtt_ns;
 
-			if (_timesync_status_pub == nullptr) {
-				_timesync_status_pub = orb_advertise(ORB_ID(timesync_status), &tsync_status);
+				if (_timesync_status_pub == nullptr) {
+					_timesync_status_pub = orb_advertise(ORB_ID(timesync_status), &tsync_status);
 
-			} else {
-				orb_publish(ORB_ID(timesync_status), _timesync_status_pub, &tsync_status);
+				} else {
+					orb_publish(ORB_ID(timesync_status), _timesync_status_pub, &tsync_status);
+				}
+
 			}
 
 			break;
@@ -144,7 +172,7 @@ uint64_t
 MavlinkTimesync::sync_stamp(uint64_t usec)
 {
 
-	if (_time_offset != 0) {
+	if (_time_offset != 0/* && _timesync_converged*/) {
 		return usec + (_time_offset / 1000) ;
 
 	} else {
@@ -152,13 +180,31 @@ MavlinkTimesync::sync_stamp(uint64_t usec)
 	}
 }
 
+/*
+bool
+MavlinkTimesync::is_converged()
+{
+
+	return good_packet_count > MIN_CONVERGENCE_SAMPLES && <some time constraint>
+}
+*/
 
 void
-MavlinkTimesync::smooth_time_offset(int64_t offset_ns)
+MavlinkTimesync::add_sample(int64_t offset_ns)
 {
-	/* The closer alpha is to 1.0, the faster the moving
-	 * average updates in response to new offset samples.
+	/* Online exponential smoothing filter. The derivative of the estimate is also
+	 * estimated in order to produce an estimate without lag in steady state :
+	 * https://en.wikipedia.org/wiki/Exponential_smoothing#Double_exponential_smoothing
 	 */
 
-	_time_offset = (_time_offset_avg_alpha * offset_ns) + ((float)1.0 - _time_offset_avg_alpha) * _time_offset;
+	int64_t time_offset_prev = _time_offset;
+    if(_time_offset == 0) {			// First offset sample
+        _time_offset = offset_ns;
+    } else {
+        // Update the estimate
+        _time_offset = _filter_alpha * offset_ns + ((float)1.0 - _filter_alpha) * (_time_offset +  _time_offset_deriv);
+        // Update the estimate of the derivative
+        _time_offset_deriv = _filter_beta * (_time_offset - time_offset_prev) + ((float)1.0 - _filter_beta) * _time_offset_deriv;
+    }
+
 }

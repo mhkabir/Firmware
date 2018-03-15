@@ -65,6 +65,12 @@ public:
 	 */
 	uint64_t sync_stamp(uint64_t usec);
 
+	/**
+	 * Return true if the timesync algorithm converged to a good estimate,
+	 * return false otherwise
+	 */
+	//bool timesync_converged();
+
 private:
 
 	/* do not allow top copying this class */
@@ -76,12 +82,18 @@ protected:
 	/**
 	 * Exponential moving average filter to smooth time offset
 	 */
-	void smooth_time_offset(int64_t offset_ns);
+	void add_sample(int64_t offset_ns);
 
 	orb_advert_t _timesync_status_pub;
 
-	float _time_offset_avg_alpha;
+	// Timesync statistics
+	float _filter_alpha;
+	float _filter_beta;
 	int64_t _time_offset;
+	int64_t _time_offset_deriv;
+
+	//uint32_t _good_packet_count;
+	//uint32_t _bad_packet_count;
 
 	Mavlink *_mavlink;
 };

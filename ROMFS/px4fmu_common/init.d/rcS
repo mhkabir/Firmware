@@ -196,7 +196,6 @@ then
 	set FMU_MODE pwm
 	set AUX_MODE pwm
 	set FMU_ARGS ""
-	set MAVLINK_F default
 	set MAVLINK_COMPANION_DEVICE /dev/ttyS2
 	set MAV_TYPE none
 	set FAILSAFE none
@@ -563,54 +562,6 @@ then
 			fi
 		fi
 	fi
-
-	if [ $MAVLINK_F == default ]
-	then
-		# Normal mode, use baudrate 57600 (default) and data rate 1000 bytes/s
-		set MAVLINK_F "-r 1200 -f"
-
-		# Use ttyS1 for MAVLink on FMUv4 in addition to ttyS0 (debug)
-		if ver hwcmp PX4FMU_V4
-		then
-			set MAVLINK_F "-r 1200 -d /dev/ttyS1"
-			# Start MAVLink on Wifi (ESP8266 port)
-			mavlink start -r 20000 -b 921600 -d /dev/ttyS0
-		fi
-
-		# Use ttyS3 (TELEM4) for MAVLink on FMUv5 in addition to ttyS1 (TELEM1) and ttyS2 (TELEM2)
-		if ver hwcmp PX4FMU_V5
-		then
-			mavlink start -r 2000 -b 57600 -d /dev/ttyS3
-		fi
-
-		if ver hwcmp AEROFC_V1
-		then
-			set MAVLINK_F "-r 1200 -d /dev/ttyS3"
-
-			# Only start mavlink if the Benewake TFMini or LeddarOne isn't being used
-			if param greater SENS_EN_TFMINI 0
-			then
-				set MAVLINK_F none
-			fi
-			if param greater SENS_EN_LEDDAR1 0
-			then
-				set MAVLINK_F none				
-			fi
-		fi
-
-		if ver hwcmp CRAZYFLIE OMNIBUS_F4SD
-		then
-			# Avoid using either of the two available serials
-			set MAVLINK_F none
-		fi
-fi
-
-	if [ "x$MAVLINK_F" == xnone ]
-	then
-	else
-		mavlink start ${MAVLINK_F}
-	fi
-	unset MAVLINK_F
 
 	#
 	# MAVLink onboard / TELEM2

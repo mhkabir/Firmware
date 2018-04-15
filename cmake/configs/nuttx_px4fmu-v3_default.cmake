@@ -18,6 +18,7 @@ set(config_module_list
 	drivers/distance_sensor
 	drivers/magnetometer
 	drivers/telemetry
+	drivers/camera_capture
 
 	drivers/batt_smbus
 	drivers/blinkm

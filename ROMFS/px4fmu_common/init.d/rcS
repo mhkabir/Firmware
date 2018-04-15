@@ -467,6 +467,13 @@ then
 		camera_feedback start
 	fi
 
+	# Camera capture driver
+	if camera_capture start
+	then
+		set FMU_MODE pwm4
+		set AUX_MODE pwm4
+	fi
+
 	# If OUTPUT_MODE == none then something is wrong with setup and we shouldn't try to enable output
 	if [ $OUTPUT_MODE != none ]
 	then

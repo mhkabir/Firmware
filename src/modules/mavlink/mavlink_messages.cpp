@@ -2014,8 +2014,12 @@ protected:
 			/* ensure that only active trigger events are sent */
 			if (trigger.timestamp > 0) {
 
+				// Use top bit to encode camera ID (only works for 2 cameras)
+				//msg.seq = msg.seq | (uint32_t(trigger.camera_id) << 31);
+
 				mavlink_msg_camera_trigger_send_struct(_mavlink->get_channel(), &msg);
 
+				/*
 				vehicle_command_s vcmd = {};
 				vcmd.timestamp = hrt_absolute_time();
 				vcmd.param1 = 0.0f; // all cameras
@@ -2032,7 +2036,7 @@ protected:
 				MavlinkCommandSender::instance().handle_vehicle_command(vcmd, _mavlink->get_channel());
 
 				// TODO: move this camera_trigger and publish as a vehicle_command
-				/* send MAV_CMD_DO_DIGICAM_CONTROL*/
+				// send MAV_CMD_DO_DIGICAM_CONTROL
 				mavlink_command_long_t digicam_ctrl_cmd = {};
 
 				digicam_ctrl_cmd.target_system = 0; // 0 for broadcast
@@ -2048,7 +2052,7 @@ protected:
 				digicam_ctrl_cmd.param7 = NAN;
 
 				mavlink_msg_command_long_send_struct(_mavlink->get_channel(), &digicam_ctrl_cmd);
-
+				*/
 				return true;
 			}
 		}

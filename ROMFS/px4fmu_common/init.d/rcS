@@ -357,15 +357,7 @@ then
 	#
 	# Set default output if not set
 	#
-	if [ $OUTPUT_MODE == none ]
-	then
-		if [ $USE_IO == yes ]
-		then
-			set OUTPUT_MODE io
-		else
-			set OUTPUT_MODE fmu
-		fi
-	fi
+	set OUTPUT_MODE fmu
 
 	if [ $OUTPUT_MODE == io -a $IO_PRESENT != yes ]
 	then
@@ -478,14 +470,11 @@ then
 			fi
 		fi
 
-		if [ $OUTPUT_MODE == fmu ]
+		if fmu mode_$FMU_MODE $FMU_ARGS
 		then
-			if fmu mode_$FMU_MODE $FMU_ARGS
-			then
-			else
-				echo "FMU start failed" >> $LOG_FILE
-				tune_control play -m ${TUNE_ERR}
-			fi
+		else
+			echo "FMU start failed" >> $LOG_FILE
+			tune_control play -m ${TUNE_ERR}
 		fi
 
 		if [ $OUTPUT_MODE == mkblctrl ]

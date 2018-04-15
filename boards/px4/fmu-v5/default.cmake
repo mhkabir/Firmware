@@ -52,6 +52,7 @@ px4_add_board(
 		px4io
 		rc_input
 		roboclaw
+		signal_capture
 		stm32
 		stm32/adc
 		stm32/armv7-m_dcache

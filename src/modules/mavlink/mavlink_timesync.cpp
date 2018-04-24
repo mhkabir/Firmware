@@ -47,8 +47,8 @@ MavlinkTimesync::MavlinkTimesync(Mavlink *mavlink) :
 	_bad_estimate_count(0),
 	_filter_alpha(ALPHA_GAIN_INITIAL),
 	_filter_beta(BETA_GAIN_INITIAL),
-	_time_offset(0),
-	_time_skew(0),
+	_time_offset(0.0),
+	_time_skew(0.0),
 	_mavlink(mavlink)
 {
 }
@@ -144,7 +144,7 @@ MavlinkTimesync::handle_message(const mavlink_message_t *msg)
 				tsync_status.timestamp = hrt_absolute_time();
 				tsync_status.remote_timestamp = tsync.tc1 / 1000ULL;
 				tsync_status.observed_offset = offset_us;
-				tsync_status.estimated_offset = _time_offset;
+				tsync_status.estimated_offset = (int64_t)_time_offset;
 				tsync_status.round_trip_time = rtt_us;
 
 				if (_timesync_status_pub == nullptr) {
@@ -191,8 +191,8 @@ MavlinkTimesync::handle_message(const mavlink_message_t *msg)
 uint64_t
 MavlinkTimesync::sync_stamp(uint64_t usec)
 {
-	if (_time_offset != 0) {
-		return (usec + _time_offset);
+	if (abs(_time_offset) > DBL_EPSILON) {
+		return (usec + (int64_t)_time_offset);
 
 	} else {
 		return hrt_absolute_time();
@@ -215,9 +215,9 @@ MavlinkTimesync::add_sample(int64_t offset_us)
 	 * https://en.wikipedia.org/wiki/Exponential_smoothing#Double_exponential_smoothing
 	 */
 
-	int64_t time_offset_prev = _time_offset;
+	double time_offset_prev = _time_offset;
 
-	if (_time_offset == 0) {			// First offset sample
+	if (abs(_time_offset) < DBL_EPSILON) {			// First offset sample
 		_time_offset = offset_us;
 
 	} else {
@@ -238,7 +238,7 @@ MavlinkTimesync::reset_filter()
 	_bad_estimate_count = 0;
 	_filter_alpha = ALPHA_GAIN_INITIAL;
 	_filter_beta = BETA_GAIN_INITIAL;
-	_time_offset = 0;
-	_time_skew = 0;
+	_time_offset = 0.0;
+	_time_skew = 0.0;
 
 }

@@ -43,10 +43,14 @@
 #pragma once
 
 #include "mavlink_bridge_header.h"
+
 #include <uORB/uORB.h>
 #include <uORB/topics/timesync_status.h>
+
 #include <drivers/drv_hrt.h>
+
 #include <math.h>
+#include <float.h>
 
 #define PX4_EPOCH_SECS 1234567890ULL
 
@@ -116,8 +120,8 @@ protected:
 	// Timesync statistics
 	double _filter_alpha;
 	double _filter_beta;
-	int64_t _time_offset;
-	int64_t _time_skew;
+	double _time_offset;
+	double _time_skew;
 
 	Mavlink *_mavlink;
 };

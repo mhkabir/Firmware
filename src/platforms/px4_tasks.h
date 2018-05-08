@@ -136,6 +136,12 @@ typedef struct {
 // complex downstream consumers
 #define SCHED_PRIORITY_SENSOR_HUB		(SCHED_PRIORITY_MAX - 6)
 
+// This is a special high priority mode for running MAVLink when the system
+// critically relies on data being sent to/from an offboard component through
+// MAVLink. Running at a higher priority reduces latency and allows high-rate
+// exchange of state and sensor data for offboard estimation and control.
+#define SCHED_PRIORITY_MAVLINK_OFFBOARD		(SCHED_PRIORITY_MAX - 7)
+
 // The log capture (which stores log data into RAM) should run faster
 // than other components, but should not run before the control pipeline
 #define SCHED_PRIORITY_LOG_CAPTURE		(SCHED_PRIORITY_MAX - 10)

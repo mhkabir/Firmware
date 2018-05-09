@@ -2690,7 +2690,7 @@ Mavlink::start(int argc, char *argv[])
 	// when the started task exits.
 	px4_task_spawn_cmd(buf,
 			   SCHED_DEFAULT,
-			   SCHED_PRIORITY_DEFAULT,
+			   SCHED_PRIORITY_MAVLINK_OFFBOARD,
 			   2650,
 			   (px4_main_t)&Mavlink::start_helper,
 			   (char *const *)argv);

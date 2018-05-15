@@ -2223,18 +2223,8 @@ Mavlink::task_main(int argc, char *argv[])
 		PX4_ERR("configure_streams_to_default() failed");
 	}
 
-	/* set main loop delay depending on data rate to minimize CPU overhead */
-	_main_loop_delay = (MAIN_LOOP_DELAY * 1000) / _datarate;
-
-	/* hard limit to 1000 Hz at max */
-	if (_main_loop_delay < MAVLINK_MIN_INTERVAL) {
-		_main_loop_delay = MAVLINK_MIN_INTERVAL;
-	}
-
-	/* hard limit to 100 Hz at least */
-	if (_main_loop_delay > MAVLINK_MAX_INTERVAL) {
-		_main_loop_delay = MAVLINK_MAX_INTERVAL;
-	}
+	/* Always run main loop at 1kHz to reduce latency */
+	_main_loop_delay = MAVLINK_MIN_INTERVAL;
 
 	/* now the instance is fully initialized and we can bump the instance count */
 	LL_APPEND(_mavlink_instances, this);

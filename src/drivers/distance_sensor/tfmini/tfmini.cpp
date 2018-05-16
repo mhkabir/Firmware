@@ -72,13 +72,13 @@
 
 #include <board_config.h>
 
-#include "tfmini_parser.h"
-
 /* Configuration Constants */
 
 #ifndef CONFIG_SCHED_WORKQUEUE
 # error This requires CONFIG_SCHED_WORKQUEUE.
 #endif
+
+#define isdigit(n) (n >= '0' && n <= '9')
 
 class TFMINI : public device::CDev
 {
@@ -109,7 +109,6 @@ private:
 	int                      _fd;
 	char                     _linebuf[10];
 	unsigned                 _linebuf_index;
-	enum TFMINI_PARSE_STATE  _parse_state;
 
 	hrt_abstime              _last_read;
 
@@ -180,7 +179,6 @@ TFMINI::TFMINI(const char *port, uint8_t rotation) :
 	_collect_phase(false),
 	_fd(-1),
 	_linebuf_index(0),
-	_parse_state(TFMINI_PARSE_STATE0_UNSYNC),
 	_last_read(0),
 	_class_instance(-1),
 	_orb_class_instance(-1),
@@ -195,7 +193,7 @@ TFMINI::TFMINI(const char *port, uint8_t rotation) :
 	_port[sizeof(_port) - 1] = '\0';
 
 	// disable debug() calls
-	_debug_enabled = false;
+	_debug_enabled = true;
 
 	// work_cancel in the dtor will explode if we don't do this...
 	memset(&_work, 0, sizeof(_work));
@@ -222,24 +220,10 @@ TFMINI::~TFMINI()
 int
 TFMINI::init()
 {
-	int32_t hw_model;
-	param_get(param_find("SENS_EN_TFMINI"), &hw_model);
 
-	switch (hw_model) {
-	case 0:
-		DEVICE_LOG("disabled.");
-		return 0;
-
-	case 1: /* TFMINI (12m, 100 Hz)*/
-		_min_distance = 0.3f;
-		_max_distance = 12.0f;
-		_conversion_interval =	10000;
-		break;
-
-	default:
-		DEVICE_LOG("invalid HW model %d.", hw_model);
-		return -1;
-	}
+	_min_distance = 0.3f;
+	_max_distance = 12.0f;
+	_conversion_interval =	10000;
 
 	/* status */
 	int ret = 0;
@@ -557,19 +541,35 @@ TFMINI::collect()
 	_last_read = hrt_absolute_time();
 
 	float distance_m = -1.0f;
-	bool valid = false;
+	float sum = 0;
+	uint16_t count = 0;
 
 	for (int i = 0; i < ret; i++) {
-		if (OK == tfmini_parser(readbuf[i], _linebuf, &_linebuf_index, &_parse_state, &distance_m)) {
-			valid = true;
+		char c = readbuf[i];
+
+		if (c == '\r') {
+			_linebuf[_linebuf_index] = 0;
+			sum += (float)atof(_linebuf);
+			count++;
+			_linebuf_index = 0;
+
+		} else if (isdigit(c) || c == '.') {
+			_linebuf[_linebuf_index++] = c;
+
+			if (_linebuf_index == sizeof(_linebuf)) {
+				// too long, discard the line
+				_linebuf_index = 0;
+			}
 		}
 	}
 
-	if (!valid) {
+	if (count == 0) {
 		return -EAGAIN;
 	}
 
-	DEVICE_DEBUG("val (float): %8.4f, raw: %s, valid: %s", (double)distance_m, _linebuf, ((valid) ? "OK" : "NO"));
+	distance_m = sum / count;
+
+	DEVICE_DEBUG("val (float): %8.4f, raw: %s", (double)distance_m, _linebuf);
 
 	struct distance_sensor_s report;
 

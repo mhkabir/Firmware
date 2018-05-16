@@ -37,7 +37,6 @@ px4_add_module(
 		-Wno-sign-compare
 	SRCS
 		tfmini.cpp
-		tfmini_parser.cpp
 	DEPENDS
 	)
 

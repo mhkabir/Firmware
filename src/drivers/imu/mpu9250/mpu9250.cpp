@@ -1384,7 +1384,8 @@ MPU9250::measure()
 	/*
 	 * Adjust and scale results to m/s^2.
 	 */
-	grb.timestamp = arb.timestamp = hrt_absolute_time();
+	grb.timestamp = hrt_absolute_time() - uint64_t(4.9f * 1000.0f);	// With 92Hz filter freq, gyro has 3.9ms lag + 1ms for SPI transfer
+	arb.timestamp = hrt_absolute_time() - uint64_t(8.8f * 1000.0f);	// With 92Hz filter freq, accel has 7.8ms lag + 1ms for SPI transfer
 
 	// report the error count as the sum of the number of bad
 	// transfers and bad register reads. This allows the higher

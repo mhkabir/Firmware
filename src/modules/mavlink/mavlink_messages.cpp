@@ -1549,50 +1549,15 @@ protected:
 		struct camera_trigger_s trigger;
 
 		if (_trigger_sub->update(&_trigger_time, &trigger)) {
-			mavlink_camera_trigger_t msg = {};
-
-			msg.time_usec = trigger.timestamp;
-			msg.seq = trigger.seq;
 
 			/* ensure that only active trigger events are sent */
 			if (trigger.timestamp > 0) {
+				mavlink_camera_trigger_t msg = {};
+
+				msg.time_usec = trigger.timestamp;
+				msg.seq = trigger.seq;
 
 				mavlink_msg_camera_trigger_send_struct(_mavlink->get_channel(), &msg);
-
-				struct vehicle_command_s cmd = {
-					.timestamp = 0,
-					.param5 = NAN,
-					.param6 = NAN,
-					.param1 = 0.0f, // all cameras
-					.param2 = 0.0f, // duration 0 because only taking one picture
-					.param3 = 1.0f, // only take one
-					.param4 = NAN,
-					.param7 = NAN,
-					.command = MAV_CMD_IMAGE_START_CAPTURE,
-					.target_system = mavlink_system.sysid,
-					.target_component = MAV_COMP_ID_CAMERA
-				};
-
-				MavlinkCommandSender::instance().handle_vehicle_command(cmd, _mavlink->get_channel());
-
-				// TODO: move this camera_trigger and publish as a vehicle_command
-				/* send MAV_CMD_DO_DIGICAM_CONTROL*/
-				mavlink_command_long_t digicam_ctrl_cmd;
-
-				digicam_ctrl_cmd.target_system = 0; // 0 for broadcast
-				digicam_ctrl_cmd.target_component = MAV_COMP_ID_CAMERA;
-				digicam_ctrl_cmd.command = MAV_CMD_DO_DIGICAM_CONTROL;
-				digicam_ctrl_cmd.confirmation = 0;
-				digicam_ctrl_cmd.param1 = NAN;
-				digicam_ctrl_cmd.param2 = NAN;
-				digicam_ctrl_cmd.param3 = NAN;
-				digicam_ctrl_cmd.param4 = NAN;
-				digicam_ctrl_cmd.param5 = 1;   // take 1 picture
-				digicam_ctrl_cmd.param6 = NAN;
-				digicam_ctrl_cmd.param7 = NAN;
-
-				mavlink_msg_command_long_send_struct(_mavlink->get_channel(), &digicam_ctrl_cmd);
-
 				return true;
 			}
 		}

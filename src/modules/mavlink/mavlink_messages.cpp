@@ -717,7 +717,7 @@ protected:
 			}
 
 			sensor_bias_s bias = {};
-			_bias_sub->update(&bias);
+			//_bias_sub->update(&bias);
 
 			differential_pressure_s differential_pressure = {};
 			_differential_pressure_sub->update(&differential_pressure);

@@ -1782,7 +1782,7 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("GLOBAL_POSITION_INT", 50.0f);
 		configure_stream_local("GPS_RAW_INT", unlimited_rate);
 		configure_stream_local("GPS2_RAW", unlimited_rate);
-		configure_stream_local("HIGHRES_IMU", 50.0f);
+		configure_stream_local("HIGHRES_IMU", unlimited_rate);
 		configure_stream_local("HOME_POSITION", 0.5f);
 		configure_stream_local("LOCAL_POSITION_NED", 30.0f);
 		configure_stream_local("NAMED_VALUE_FLOAT", 10.0f);
@@ -2199,6 +2199,7 @@ Mavlink::task_main(int argc, char *argv[])
 
 	if (configure_streams_to_default() != 0) {
 		PX4_ERR("configure_streams_to_default() failed");
+
 	}
 
 	/* Always run main loop at 1kHz to reduce latency */

@@ -783,15 +783,7 @@ void Ekf2::run()
 			imu_bias_reset_request = !_ekf.reset_imu_bias();
 		}
 
-		// in replay mode we are getting the actual timestamp from the sensor topic
-		hrt_abstime now = 0;
-
-		if (_replay_mode) {
-			now = sensors.timestamp;
-
-		} else {
-			now = hrt_absolute_time();
-		}
+		hrt_abstime now = sensors.timestamp;
 
 		// push imu data into estimator
 		float gyro_integral[3];
@@ -1207,6 +1199,7 @@ void Ekf2::run()
 
 			ekf2_timestamps.visual_odometry_timestamp_rel = (int16_t)((int64_t)ev_odom.timestamp / 100 -
 					(int64_t)ekf2_timestamps.timestamp / 100);
+
 		}
 
 		bool vehicle_land_detected_updated = false;

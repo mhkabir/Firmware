@@ -1549,6 +1549,9 @@ protected:
 				msg.time_usec = trigger.timestamp;
 				msg.seq = trigger.seq;
 
+				// Use top bit to encode camera ID (only works for 2 cameras)
+				msg.seq = msg.seq | (uint32_t(trigger.camera_id) << 31);
+
 				mavlink_msg_camera_trigger_send_struct(_mavlink->get_channel(), &msg);
 				return true;
 			}

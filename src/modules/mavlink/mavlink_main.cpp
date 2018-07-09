@@ -1790,7 +1790,6 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("ACTUATOR_CONTROL_TARGET0", 10.0f);
 		configure_stream_local("ADSB_VEHICLE", unlimited_rate);
 		configure_stream_local("ALTITUDE", 10.0f);
-		configure_stream_local("ATTITUDE", 100.0f);
 		configure_stream_local("ATTITUDE_QUATERNION", 50.0f);
 		configure_stream_local("ATTITUDE_TARGET", 10.0f);
 		configure_stream_local("CAMERA_CAPTURE", 2.0f);
@@ -1804,7 +1803,7 @@ Mavlink::configure_streams_to_default(const char *configure_single_stream)
 		configure_stream_local("EXTENDED_SYS_STATE", 5.0f);
 		configure_stream_local("GLOBAL_POSITION_INT", 50.0f);
 		configure_stream_local("GPS_RAW_INT", unlimited_rate);
-		configure_stream_local("HIGHRES_IMU", 244.0f);
+		configure_stream_local("HIGHRES_IMU", unlimited_rate);
 		configure_stream_local("HOME_POSITION", 0.5f);
 		configure_stream_local("LOCAL_POSITION_NED", 30.0f);
 		configure_stream_local("NAMED_VALUE_FLOAT", 10.0f);

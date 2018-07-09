@@ -49,24 +49,20 @@ CameraCapture	*g_camera_capture;
 }
 
 CameraCapture::CameraCapture() :
-	_capture_enabled(false),
 	_trigger_pub(nullptr),
 	_command_ack_pub(nullptr),
 	_command_sub(-1),
-	_capture_seq(0),
-	_last_fall_time(0),
-	_last_exposure_time(0),
-	_capture_overflows(0)
+	_capture_enabled{},
+	_capture_overflows{},
+	_capture_seq{},
+	_last_fall_time{},
+	_last_exposure_time{}
 {
 
 	memset(&_work, 0, sizeof(_work));
 
-	// Parameters
-	_p_strobe_delay = param_find("CAM_CAP_DELAY");
-	param_get(_p_strobe_delay, &_strobe_delay);
-
 	struct camera_trigger_s trigger = {};
-	_trigger_pub = orb_advertise(ORB_ID(camera_trigger), &trigger);
+	_trigger_pub = orb_advertise_queue(ORB_ID(camera_trigger), &trigger, 3);
 }
 
 CameraCapture::~CameraCapture()
@@ -78,23 +74,27 @@ void
 CameraCapture::capture_callback(uint32_t chan_index,
 				hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow)
 {
+	uint8_t cam_id = chan_index - PIN_BASE;
 
 	if (edge_state == 0) {											// Falling edge
-		// Timestamp and compensate for strobe delay
-		_last_fall_time = edge_time - uint64_t(1000 * _strobe_delay);
+		// Timestamp it
+		_last_fall_time[cam_id] = edge_time;
 
-	} else if (edge_state == 1 && _last_fall_time > 0) {			// Falling edge and got rising before
+	} else if (edge_state == 1 && _last_fall_time[cam_id] > 0) {			// Falling edge and got rising before
 		struct camera_trigger_s	trigger {};
 
-		trigger.timestamp = edge_time - ((edge_time - _last_fall_time) / 2);	// Get timestamp of mid-exposure
-		trigger.seq = _capture_seq++;
+		// Calculate exposure time
+		_last_exposure_time[cam_id] = edge_time - _last_fall_time[cam_id];
+
+		trigger.timestamp = edge_time - (_last_exposure_time[cam_id] / 2);	// Get timestamp of mid-exposure
+		trigger.camera_id = cam_id;
+		trigger.seq = _capture_seq[cam_id]++;
 
 		orb_publish(ORB_ID(camera_trigger), _trigger_pub, &trigger);
 
-		_last_exposure_time = edge_time - _last_fall_time;
 	}
 
-	_capture_overflows = overflow;
+	_capture_overflows[cam_id] = overflow;
 
 }
 
@@ -127,18 +127,18 @@ CameraCapture::cycle_trampoline(void *arg)
 		// TODO : this should eventuallly be a capture control command
 		if (cmd.command == vehicle_command_s::VEHICLE_CMD_DO_TRIGGER_CONTROL) {
 
+			// get camera ID
+			uint8_t cam_id = commandParamToInt(cmd.param4);
+
+			// Reset frame sequence
+			bool reset_seq = commandParamToInt(cmd.param2) == 1;
+
 			// Enable/disable signal capture
 			if (commandParamToInt(cmd.param1) == 1) {
-				cap->set_capture_control(true);
+				cap->set_capture_control(cam_id, true, reset_seq);
 
 			} else if (commandParamToInt(cmd.param1) == 0) {
-				cap->set_capture_control(false);
-
-			}
-
-			// Reset capture sequence
-			if (commandParamToInt(cmd.param2) == 1) {
-				cap->reset_statistics(true);
+				cap->set_capture_control(cam_id, false, reset_seq);
 
 			}
 
@@ -171,38 +171,44 @@ CameraCapture::cycle_trampoline(void *arg)
 }
 
 void
-CameraCapture::set_capture_control(bool enabled)
+CameraCapture::set_capture_control(uint8_t cam_id, bool enable, bool reset_seq)
 {
-	if (enabled) {
-		// register callbacks
-		//up_input_capture_set(4, Both, 0, &CameraCapture::capture_trampoline, this);
-		up_input_capture_set(5, Both, 0, &CameraCapture::capture_trampoline, this);
-		_capture_enabled = true;
+	uint32_t pin = PIN_BASE + cam_id;
 
-	} else {
-		//up_input_capture_set(4, Disabled, 0, NULL, NULL);
-		up_input_capture_set(5, Disabled, 0, NULL, NULL);
-		_capture_enabled = false;
+	if (enable && !_capture_enabled[cam_id]) {
+		// Enable signal capture
+		reset_statistics(cam_id, reset_seq);
+		up_input_capture_set(pin, Both, 0, &CameraCapture::capture_trampoline, this);
+
+		_capture_enabled[cam_id] = true;
+
+	} else if (!enable && _capture_enabled[cam_id]) {
+		// Disable signal capture
+		up_input_capture_set(pin, Disabled, 0, NULL, NULL);
+		reset_statistics(cam_id, reset_seq);
+
+		_capture_enabled[cam_id] = false;
+
 	}
 
-	reset_statistics(false);
 }
 
 void
-CameraCapture::reset_statistics(bool reset_seq)
+CameraCapture::reset_statistics(uint8_t cam_id, bool reset_seq)
 {
-	if (reset_seq) { _capture_seq = 0; }
 
-	_last_fall_time = 0;
-	_last_exposure_time = 0;
-	_capture_overflows = 0;
+	if (reset_seq) { _capture_seq[cam_id] = 0; }
+
+	_last_fall_time[cam_id] = 0;
+	_last_exposure_time[cam_id] = 0;
+
 }
 
 void
 CameraCapture::start()
 {
 	// start to monitor at low rates for capture control commands
-	work_queue(LPWORK, &_work, (worker_t)&CameraCapture::cycle_trampoline, this, USEC2TICK(1)); // TODO : is this low rate??!
+	work_queue(LPWORK, &_work, (worker_t)&CameraCapture::cycle_trampoline, this, USEC2TICK(1));
 }
 
 void
@@ -219,16 +225,19 @@ CameraCapture::stop()
 void
 CameraCapture::status()
 {
-	PX4_INFO("Capture enabled : %s", _capture_enabled ? "YES" : "NO");
-	PX4_INFO("Frame sequence : %u", _capture_seq);
-	PX4_INFO("Last fall timestamp : %llu", _last_fall_time);
-	PX4_INFO("Last exposure time : %0.2f ms", double(_last_exposure_time) / 1000.0);
-	PX4_INFO("Number of overflows : %u", _capture_overflows);
+	for (uint8_t cam_id = 0; cam_id < NUM_CAMERAS; cam_id++) {
+		PX4_INFO("Camera %u status :", cam_id);
+		PX4_INFO("  Capture enabled : %s", _capture_enabled[cam_id] ? "YES" : "NO");
+		PX4_INFO("  Number of overflows : %u", _capture_overflows[cam_id]);
+		PX4_INFO("  Frame sequence : %u", _capture_seq[cam_id]);
+		PX4_INFO("  Last fall timestamp : %llu", _last_fall_time[cam_id]);
+		PX4_INFO("  Last exposure time : %0.2f ms", double(_last_exposure_time[cam_id]) / 1000.0);
+	}
 }
 
 static int usage()
 {
-	PX4_INFO("usage: camera_capture {start|stop|on|off|reset}\n");
+	PX4_INFO("usage: camera_capture {start|stop|status}\n");
 	return 1;
 }
 
@@ -267,16 +276,6 @@ int camera_capture_main(int argc, char *argv[])
 
 	} else if (!strcmp(argv[1], "status")) {
 		camera_capture::g_camera_capture->status();
-
-	} else if (!strcmp(argv[1], "on")) {
-		camera_capture::g_camera_capture->set_capture_control(true);
-
-	} else if (!strcmp(argv[1], "off")) {
-		camera_capture::g_camera_capture->set_capture_control(false);
-
-	} else if (!strcmp(argv[1], "reset")) {
-		camera_capture::g_camera_capture->set_capture_control(false);
-		camera_capture::g_camera_capture->reset_statistics(true);
 
 	} else {
 		return usage();

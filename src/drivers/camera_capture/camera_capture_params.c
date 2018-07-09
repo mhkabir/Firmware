@@ -37,15 +37,3 @@
  *
  * @author Mohammed Kabir <kabir@uasys.io>
  */
-/**
- * Camera strobe delay
- *
- * This parameter sets the delay between image integration start and strobe firing
- *
- * @unit ms
- * @min 0.0
- * @max 100.0
- * @decimal 1
- * @group Camera Capture
- */
-PARAM_DEFINE_FLOAT(CAM_CAP_DELAY, 1.0f);

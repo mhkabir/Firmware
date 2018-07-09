@@ -62,6 +62,10 @@
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_command_ack.h>
 
+#define NUM_CAMERAS 2
+
+#define PIN_BASE 4
+
 class CameraCapture
 {
 public:
@@ -91,16 +95,11 @@ public:
 			hrt_abstime edge_time, uint32_t edge_state,
 			uint32_t overflow);
 
-	void 			set_capture_control(bool enabled);
-
-	void			reset_statistics(bool reset_seq);
-
+	void 			set_capture_control(uint8_t cam_id, bool enable, bool reset_seq);
 
 	static struct work_s	_work;
 
 private:
-
-	bool			_capture_enabled;
 
 	// Publishers
 	orb_advert_t	_trigger_pub;
@@ -109,15 +108,12 @@ private:
 	// Subscribers
 	int				_command_sub;
 
-	// Parameters
-	param_t 		_p_strobe_delay;
-	float			_strobe_delay;
-
-	// Signal capture statistics
-	uint32_t		_capture_seq;
-	hrt_abstime		_last_fall_time;
-	hrt_abstime		_last_exposure_time;
-	uint32_t 		_capture_overflows;
+	// Per-camera capture statistics
+	bool			_capture_enabled[NUM_CAMERAS];
+	uint32_t 		_capture_overflows[NUM_CAMERAS];
+	uint32_t		_capture_seq[NUM_CAMERAS];
+	uint64_t		_last_fall_time[NUM_CAMERAS];
+	uint64_t		_last_exposure_time[NUM_CAMERAS];
 
 	// Signal capture callback
 	void			capture_callback(uint32_t chan_index,
@@ -125,6 +121,8 @@ private:
 
 	// Low-rate command handling loop
 	static void		cycle_trampoline(void *arg);
+
+	void			reset_statistics(uint8_t cam_id, bool reset_seq);
 
 };
 struct work_s CameraCapture::_work;

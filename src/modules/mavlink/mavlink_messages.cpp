@@ -2014,6 +2014,9 @@ protected:
 			/* ensure that only active trigger events are sent */
 			if (trigger.timestamp > 0) {
 
+				// Use top bit to encode camera ID (only works for 2 cameras)
+				msg.seq = msg.seq | (uint32_t(trigger.camera_id) << 31);
+
 				mavlink_msg_camera_trigger_send_struct(_mavlink->get_channel(), &msg);
 
 				vehicle_command_s vcmd = {};

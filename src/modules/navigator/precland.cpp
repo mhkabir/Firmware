@@ -77,11 +77,7 @@ PrecLand::on_activation()
 	_search_cnt = 0;
 	_last_slewrate_time = 0;
 
-	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
-
-	if (!map_projection_initialized(&_map_ref)) {
-		map_projection_init(&_map_ref, vehicle_local_position->ref_lat, vehicle_local_position->ref_lon);
-	}
+	//vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position(); TODO : why not use pointer everywhere?!
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
@@ -90,10 +86,12 @@ PrecLand::on_activation()
 	// Check that the current position setpoint is valid, otherwise land at current position
 	if (!pos_sp_triplet->current.valid) {
 		PX4_WARN("Resetting landing position to current position");
-		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
-		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
-		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+		pos_sp_triplet->current.x = _navigator->get_local_position()->x;
+		pos_sp_triplet->current.y = _navigator->get_local_position()->y;
+		pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+		pos_sp_triplet->current.position_valid = true;
 		pos_sp_triplet->current.valid = true;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 	}
 
 	_sp_pev = matrix::Vector2f(0, 0);
@@ -176,8 +174,9 @@ PrecLand::run_state_start()
 	}
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-	float dist = get_distance_to_next_waypoint(pos_sp_triplet->current.lat, pos_sp_triplet->current.lon,
-			_navigator->get_global_position()->lat, _navigator->get_global_position()->lon);
+	// TODO check
+	float dist = get_distance_to_point(pos_sp_triplet->current.x, pos_sp_triplet->current.y,
+			_navigator->get_local_position()->x, _navigator->get_local_position()->y);
 
 	// check if we've reached the start point
 	if (dist < _navigator->get_acceptance_radius()) {
@@ -214,9 +213,12 @@ PrecLand::run_state_horizontal_approach()
 		PX4_WARN("Lost landing target while landing (horizontal approach).");
 
 		// Stay at current position for searching for the landing target
-		pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
-		pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
-		pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+		pos_sp_triplet->current.x = _navigator->get_local_position()->x;
+		pos_sp_triplet->current.y = _navigator->get_local_position()->y;
+		pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+		pos_sp_triplet->current.valid = true;
+		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 
 		if (!switch_to_state_start()) {
 			if (!switch_to_state_fallback()) {
@@ -256,14 +258,12 @@ PrecLand::run_state_horizontal_approach()
 
 	slewrate(x, y);
 
-	// XXX need to transform to GPS coords because mc_pos_control only looks at that
-	double lat, lon;
-	map_projection_reproject(&_map_ref, x, y, &lat, &lon);
-
-	pos_sp_triplet->current.lat = lat;
-	pos_sp_triplet->current.lon = lon;
-	pos_sp_triplet->current.alt = _approach_alt;
-	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+	pos_sp_triplet->current.x = x;
+	pos_sp_triplet->current.y = y;
+	pos_sp_triplet->current.z = _approach_alt;
+	pos_sp_triplet->current.valid = true;
+	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 
 	_navigator->set_position_setpoint_triplet_updated();
 }
@@ -279,9 +279,12 @@ PrecLand::run_state_descend_above_target()
 			PX4_WARN("Lost landing target while landing (descending).");
 
 			// Stay at current position for searching for the target
-			pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
-			pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
-			pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+			pos_sp_triplet->current.x = _navigator->get_local_position()->x;
+			pos_sp_triplet->current.y = _navigator->get_local_position()->y;
+			pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+			pos_sp_triplet->current.valid = true;
+			pos_sp_triplet->current.position_valid = true;
+			pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 
 			if (!switch_to_state_start()) {
 				if (!switch_to_state_fallback()) {
@@ -293,13 +296,10 @@ PrecLand::run_state_descend_above_target()
 		return;
 	}
 
-	// XXX need to transform to GPS coords because mc_pos_control only looks at that
-	double lat, lon;
-	map_projection_reproject(&_map_ref, _target_pose.x_abs, _target_pose.y_abs, &lat, &lon);
-
-	pos_sp_triplet->current.lat = lat;
-	pos_sp_triplet->current.lon = lon;
-
+	pos_sp_triplet->current.x = _target_pose.x_abs;
+	pos_sp_triplet->current.y = _target_pose.y_abs;
+	pos_sp_triplet->current.valid = true;
+	pos_sp_triplet->current.position_valid = true;
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
 
 	_navigator->set_position_setpoint_triplet_updated();
@@ -320,8 +320,11 @@ PrecLand::run_state_search()
 			// target just became visible. Stop climbing, but give it some margin so we don't stop too apruptly
 			_target_acquired_time = hrt_absolute_time();
 			position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-			float new_alt = _navigator->get_global_position()->alt + 1.0f;
-			pos_sp_triplet->current.alt = new_alt < pos_sp_triplet->current.alt ? new_alt : pos_sp_triplet->current.alt;
+			//float new_alt = _navigator->get_local_position()->z - 0.2f; // TODO : arbitrary
+			pos_sp_triplet->current.z = _navigator->get_local_position()->z;/*new_alt < pos_sp_triplet->current.z ? new_alt : pos_sp_triplet->current.z */
+			pos_sp_triplet->current.valid = true;
+			pos_sp_triplet->current.position_valid = true;
+			pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 			_navigator->set_position_setpoint_triplet_updated();
 		}
 
@@ -356,7 +359,7 @@ PrecLand::switch_to_state_start()
 {
 	if (check_state_conditions(PrecLandState::Start)) {
 		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 		_navigator->set_position_setpoint_triplet_updated();
 		_search_cnt++;
 
@@ -374,7 +377,7 @@ bool
 PrecLand::switch_to_state_horizontal_approach()
 {
 	if (check_state_conditions(PrecLandState::HorizontalApproach)) {
-		_approach_alt = _navigator->get_global_position()->alt;
+		_approach_alt = _navigator->get_local_position()->z;
 
 		_point_reached_time = 0;
 
@@ -414,11 +417,12 @@ bool
 PrecLand::switch_to_state_search()
 {
 	PX4_INFO("Climbing to search altitude.");
-	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-	pos_sp_triplet->current.alt = vehicle_local_position->ref_alt + _param_search_alt.get();
-	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+	pos_sp_triplet->current.z = -_param_search_alt.get();
+	pos_sp_triplet->current.valid = true;
+	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_PRECLAND;
 	_navigator->set_position_setpoint_triplet_updated();
 
 	_target_acquired_time = 0;
@@ -433,9 +437,11 @@ PrecLand::switch_to_state_fallback()
 {
 	PX4_WARN("Falling back to normal land.");
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-	pos_sp_triplet->current.lat = _navigator->get_global_position()->lat;
-	pos_sp_triplet->current.lon = _navigator->get_global_position()->lon;
-	pos_sp_triplet->current.alt = _navigator->get_global_position()->alt;
+	pos_sp_triplet->current.x = _navigator->get_local_position()->x;
+	pos_sp_triplet->current.y = _navigator->get_local_position()->y;
+	pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+	pos_sp_triplet->current.valid = true;
+	pos_sp_triplet->current.position_valid = true;
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
 	_navigator->set_position_setpoint_triplet_updated();
 
@@ -534,8 +540,8 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 		dt = 50000 / SEC2USEC;
 
 		// set a best guess for previous setpoints for smooth transition
-		map_projection_project(&_map_ref, _navigator->get_position_setpoint_triplet()->current.lat,
-				       _navigator->get_position_setpoint_triplet()->current.lon, &_sp_pev(0), &_sp_pev(1));
+		_sp_pev(0) = _navigator->get_position_setpoint_triplet()->current.x;
+		_sp_pev(1) = _navigator->get_position_setpoint_triplet()->current.y;
 		_sp_pev_prev(0) = _sp_pev(0) - _navigator->get_local_position()->vx * dt;
 		_sp_pev_prev(1) = _sp_pev(1) - _navigator->get_local_position()->vy * dt;
 	}
@@ -573,4 +579,9 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 	sp_x = sp_curr(0);
 	sp_y = sp_curr(1);
+}
+
+float PrecLand::get_distance_to_point(float &x1, float &y1, float &x2, float &y2)
+{
+	return sqrtf(powf(x1 - x2, 2) + powf(y1 - y2, 2));
 }

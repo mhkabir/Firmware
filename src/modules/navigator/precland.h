@@ -97,14 +97,13 @@ private:
 	// check if a given state could be changed into. Return true if possible to transition to state, false otherwise
 	bool check_state_conditions(PrecLandState state);
 	void slewrate(float &sp_x, float &sp_y);
+	float get_distance_to_point(float &x1, float &y1, float &x2, float &y2);
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
 
 	int _target_pose_sub{-1};
 	bool _target_pose_valid{false}; /**< whether we have received a landing target position message */
 	bool _target_pose_updated{false}; /**< wether the landing target position message is updated */
-
-	struct map_projection_reference_s _map_ref {}; /**< reference for local/global projections */
 
 	uint64_t _state_start_time{0}; /**< time when we entered current state */
 	uint64_t _last_slewrate_time{0}; /**< time when we last limited setpoint changes */

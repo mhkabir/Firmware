@@ -105,12 +105,6 @@ then
 	fi
 fi
 
-if [ "x$MAVLINK_F" == xnone ]
-then
-else
-	mavlink start ${MAVLINK_F}
-fi
-
 #
 # MAVLink onboard / TELEM2
 #

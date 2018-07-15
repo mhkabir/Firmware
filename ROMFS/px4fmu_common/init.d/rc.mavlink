@@ -219,7 +219,7 @@ then
 			mavlink start -d ${MAVLINK_COMPANION_DEVICE} -b 921600 -m onboard -r 80000 -x -f
 		fi
 	else
-		mavlink start -d ${MAVLINK_COMPANION_DEVICE} -b 921600 -m onboard -r 80000 -x -f
+		mavlink start -d ${MAVLINK_COMPANION_DEVICE} -b 921600 -m onboard -r 80000 -x -f -z
 	fi
 fi
 if param compare SYS_COMPANION 1921600

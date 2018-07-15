@@ -7,7 +7,8 @@ uint8 SETPOINT_TYPE_TAKEOFF=3	# takeoff setpoint
 uint8 SETPOINT_TYPE_LAND=4	# land setpoint, altitude must be ignored, descend until landing
 uint8 SETPOINT_TYPE_IDLE=5	# do nothing, switch off motors or keep at idle speed (MC)
 uint8 SETPOINT_TYPE_OFFBOARD=6 	# setpoint in NED frame (x, y, z, vx, vy, vz) set by offboard
-uint8 SETPOINT_TYPE_FOLLOW_TARGET=7  # setpoint in NED frame (x, y, z, vx, vy, vz) set by follow target
+uint8 SETPOINT_TYPE_FOLLOW_TARGET=7  # setpoint in NED frame (x, y, z, vx, vy, vz) set by follow
+uint8 SETPOINT_TYPE_PRECLAND=8  # setpoint in NED frame set by precland module
 
 uint8 VELOCITY_FRAME_LOCAL_NED = 1 # MAV_FRAME_LOCAL_NED
 uint8 VELOCITY_FRAME_BODY_NED = 8 # MAV_FRAME_BODY_NED

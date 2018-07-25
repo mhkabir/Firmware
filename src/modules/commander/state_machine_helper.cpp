@@ -330,9 +330,8 @@ main_state_transition(const vehicle_status_s &status, const main_state_t new_mai
 
 	case commander_state_s::MAIN_STATE_AUTO_PRECLAND:
 
-		/* need local and global position, and precision land only implemented for multicopters */
+		/* need local position, and precision land only implemented for multicopters */
 		if (status_flags.condition_local_position_valid
-		    && status_flags.condition_global_position_valid
 		    && status.is_rotary_wing) {
 
 			ret = TRANSITION_CHANGED;

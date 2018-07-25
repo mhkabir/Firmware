@@ -64,7 +64,7 @@
 
 #define NUM_CAMERAS 2
 
-#define PIN_BASE 4
+#define PIN_BASE 6
 
 class CameraCapture
 {
@@ -109,6 +109,7 @@ private:
 	int				_command_sub;
 
 	// Per-camera capture statistics
+	uint32_t		_capture_edge[NUM_CAMERAS];
 	bool			_capture_enabled[NUM_CAMERAS];
 	uint32_t 		_capture_overflows[NUM_CAMERAS];
 	uint32_t		_capture_seq[NUM_CAMERAS];

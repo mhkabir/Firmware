@@ -56,7 +56,8 @@ CameraCapture::CameraCapture() :
 	_capture_overflows{},
 	_capture_seq{},
 	_last_fall_time{},
-	_last_exposure_time{}
+	_last_exposure_time{},
+	_time_offset(0.0) // in seconds
 {
 
 	memset(&_work, 0, sizeof(_work));
@@ -80,13 +81,13 @@ CameraCapture::capture_callback(uint32_t chan_index,
 		// Timestamp it
 		_last_fall_time[cam_id] = edge_time;
 
-	} else if (edge_state == 1 && _last_fall_time[cam_id] > 0) {			// Falling edge and got rising before
+	} else if (edge_state == 1 && _last_fall_time[cam_id] > 0) {			// Rising edge and got falling before
 		struct camera_trigger_s	trigger {};
 
 		// Calculate exposure time
 		_last_exposure_time[cam_id] = edge_time - _last_fall_time[cam_id];
 
-		trigger.timestamp = edge_time - (_last_exposure_time[cam_id] / 2);	// Get timestamp of mid-exposure
+		trigger.timestamp = edge_time - (_last_exposure_time[cam_id] / 2); //+ uint64_t(_time_offset * 1000000.0f);	// Get timestamp of mid-exposure
 		trigger.camera_id = cam_id;
 		trigger.seq = _capture_seq[cam_id]++;
 

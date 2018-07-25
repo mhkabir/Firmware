@@ -115,6 +115,9 @@ private:
 	uint64_t		_last_fall_time[NUM_CAMERAS];
 	uint64_t		_last_exposure_time[NUM_CAMERAS];
 
+	// Time offset
+	float 			_time_offset;
+
 	// Signal capture callback
 	void			capture_callback(uint32_t chan_index,
 			hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);

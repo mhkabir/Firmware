@@ -57,14 +57,14 @@ for d in data:
             sensor_gyro_0 = d.data
             print('found gyro 0 data')
             num_gyros = 1
-        if sensor_instance == 1:
-            sensor_gyro_1 = d.data
-            print('found gyro 1 data')
-            num_gyros = 2
-        if sensor_instance == 2:
-            sensor_gyro_2 = d.data
-            print('found gyro 2 data')
-            num_gyros = 3
+        #if sensor_instance == 1:
+        #    sensor_gyro_1 = d.data
+        #    print('found gyro 1 data')
+        #    num_gyros = 2
+        #if sensor_instance == 2:
+        #    sensor_gyro_2 = d.data
+        #    print('found gyro 2 data')
+        #    num_gyros = 3
         sensor_instance = sensor_instance +1
 
 # extract accel data
@@ -76,14 +76,14 @@ for d in data:
             sensor_accel_0 = d.data
             print('found accel 0 data')
             num_accels = 1
-        if sensor_instance == 1:
-            sensor_accel_1 = d.data
-            print('found accel 1 data')
-            num_accels = 2
-        if sensor_instance == 2:
-            sensor_accel_2 = d.data
-            print('found accel 2 data')
-            num_accels = 3
+        #if sensor_instance == 1:
+        #    sensor_accel_1 = d.data
+        #    print('found accel 1 data')
+        #    num_accels = 2
+        #if sensor_instance == 2:
+        #    sensor_accel_2 = d.data
+        #    print('found accel 2 data')
+        #    num_accels = 3
         sensor_instance = sensor_instance +1
 
 # extract baro data

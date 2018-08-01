@@ -341,12 +341,6 @@ then
 	# Internal SPI bus ICM-20689
 	mpu6000 -R 8 -z -T 20689 start
 
-	# Internal SPI bus BMI055 accel
-	bmi055 -A -R 10 start
-
-	# Internal SPI bus BMI055 gyro
-	bmi055 -G -R 10 start
-
 	# Possible external compasses
 	hmc5883 -C -T -X start
 

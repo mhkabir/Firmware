@@ -676,9 +676,9 @@ MavlinkReceiver::handle_message_optical_flow_rad(mavlink_message_t *msg)
 	f.integration_timespan = flow.integration_time_us;
 	f.pixel_flow_x_integral = flow.integrated_x;
 	f.pixel_flow_y_integral = flow.integrated_y;
-	f.gyro_x_rate_integral = flow.integrated_xgyro;
-	f.gyro_y_rate_integral = flow.integrated_ygyro;
-	f.gyro_z_rate_integral = flow.integrated_zgyro;
+	f.gyro_x_rate_integral = NAN;
+	f.gyro_y_rate_integral = NAN;
+	f.gyro_z_rate_integral = NAN;
 	f.time_since_last_sonar_update = flow.time_delta_distance_us;
 	f.ground_distance_m = flow.distance;
 	f.quality = flow.quality;

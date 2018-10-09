@@ -9,5 +9,7 @@
 
 sh /etc/init.d/rc.mc_defaults
 
+obstacle_avoidance start
+
 set MIXER quad_w
 

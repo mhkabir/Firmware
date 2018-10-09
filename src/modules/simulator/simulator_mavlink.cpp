@@ -1231,8 +1231,7 @@ int Simulator::publish_odometry_topic(mavlink_message_t *odom_mavlink)
 
 int Simulator::publish_distance_topic(mavlink_distance_sensor_t *dist_mavlink)
 {
-	uint64_t timestamp = hrt_absolute_time();
-
+	/*
 	struct distance_sensor_s dist;
 	memset(&dist, 0, sizeof(dist));
 
@@ -1248,6 +1247,27 @@ int Simulator::publish_distance_topic(mavlink_distance_sensor_t *dist_mavlink)
 
 	int dist_multi;
 	orb_publish_auto(ORB_ID(distance_sensor), &_dist_pub, &dist, &dist_multi, ORB_PRIO_HIGH);
+	*/
+
+	struct obstacle_distance_s obs = {};
+	obs.timestamp = hrt_absolute_time();
+	obs.min_distance = uint16_t(dist_mavlink->min_distance);
+	obs.max_distance = uint16_t(dist_mavlink->max_distance);
+	obs.distances[0] = uint16_t(dist_mavlink->current_distance);
+
+	if (obs.distances[0] >= obs.max_distance) {
+		obs.distances[0] = obs.max_distance + 1;
+
+	} else if (obs.distances[0] <= obs.min_distance) {
+		obs.distances[0] = obs.max_distance + 1;
+	}
+
+	for(int i = 1; i < 72; i++) {
+		obs.distances[i] = UINT16_MAX;
+	}
+
+	int instance;
+	orb_publish_auto(ORB_ID(obstacle_distance), &_obstacle_pub, &obs, &instance, ORB_PRIO_HIGH);
 
 	return OK;
 }

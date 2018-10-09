@@ -62,6 +62,7 @@
 #include <uORB/uORB.h>
 #include <uORB/topics/optical_flow.h>
 #include <uORB/topics/distance_sensor.h>
+#include <uORB/topics/obstacle_distance.h>
 #include <v2.0/mavlink_types.h>
 #include <v2.0/common/mavlink.h>
 #include <lib/ecl/geo/geo.h>
@@ -248,7 +249,8 @@ private:
 		_mag_pub(nullptr),
 		_flow_pub(nullptr),
 		_visual_odometry_pub(nullptr),
-		_dist_pub(nullptr),
+		//_dist_pub(nullptr),
+		_obstacle_pub(nullptr),
 		_battery_pub(nullptr),
 		_param_sub(-1),
 		_initialized(false),
@@ -326,7 +328,8 @@ private:
 	orb_advert_t _mag_pub;
 	orb_advert_t _flow_pub;
 	orb_advert_t _visual_odometry_pub;
-	orb_advert_t _dist_pub;
+	//orb_advert_t _dist_pub;
+	orb_advert_t _obstacle_pub;
 	orb_advert_t _battery_pub;
 	orb_advert_t _irlock_report_pub;
 

@@ -47,6 +47,7 @@ set(config_module_list
 	drivers/tap_esc
 	drivers/vmount
 	modules/sensors
+	drivers/vesc
 
 	#
 	# System commands

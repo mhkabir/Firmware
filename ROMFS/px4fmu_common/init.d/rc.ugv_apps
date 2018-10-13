@@ -16,9 +16,9 @@ ekf2 start
 #
 # Start attitude controllers.
 #
-gnd_att_control start
-gnd_pos_control start
-
+#gnd_att_control start
+#gnd_pos_control start
+vesc start -d /dev/ttyS2
 
 #
 # Start Land Detector.

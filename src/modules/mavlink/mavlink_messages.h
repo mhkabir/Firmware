@@ -43,6 +43,8 @@
 
 #include "mavlink_stream.h"
 
+#define MAVLINK_NUM_DISTANCE_SENSORS 2
+
 class StreamListItem
 {
 

@@ -3891,12 +3891,18 @@ public:
 
 	unsigned get_size()
 	{
-		return _distance_sensor_sub->is_published() ? (MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
+		bool published = false;
+
+		for (int i = 0; i < MAVLINK_NUM_DISTANCE_SENSORS; i++) {
+			published |= _distance_sensor_sub[i]->is_published();
+		}
+
+		return published ? (MAVLINK_MSG_ID_DISTANCE_SENSOR_LEN + MAVLINK_NUM_NON_PAYLOAD_BYTES) : 0;
 	}
 
 private:
-	MavlinkOrbSubscription *_distance_sensor_sub;
-	uint64_t _dist_sensor_time;
+	MavlinkOrbSubscription *_distance_sensor_sub[MAVLINK_NUM_DISTANCE_SENSORS];
+	uint64_t _dist_sensor_time[MAVLINK_NUM_DISTANCE_SENSORS];
 
 	/* do not allow top copying this class */
 	MavlinkStreamDistanceSensor(MavlinkStreamDistanceSensor &) = delete;
@@ -3904,53 +3910,63 @@ private:
 
 protected:
 	explicit MavlinkStreamDistanceSensor(Mavlink *mavlink) : MavlinkStream(mavlink),
-		_distance_sensor_sub(_mavlink->add_orb_subscription(ORB_ID(distance_sensor))),
-		_dist_sensor_time(0)
-	{}
+		_dist_sensor_time{}
+	{
+		// Subscribe to all distance sensors
+		for (int i = 0; i < MAVLINK_NUM_DISTANCE_SENSORS; i++) {
+			_distance_sensor_sub[i] = _mavlink->add_orb_subscription(ORB_ID(distance_sensor), i);
+		}
+	}
 
 	bool send(const hrt_abstime t)
 	{
-		distance_sensor_s dist_sensor;
 
-		if (_distance_sensor_sub->update(&_dist_sensor_time, &dist_sensor)) {
+		bool sent = false;
 
-			mavlink_distance_sensor_t msg = {};
+		for (int i = 0; i < MAVLINK_NUM_DISTANCE_SENSORS; i++) {
 
-			msg.time_boot_ms = dist_sensor.timestamp / 1000; /* us to ms */
+			distance_sensor_s dist_sensor;
 
-			/* TODO: use correct ID here */
-			msg.id = 0;
+			if (_distance_sensor_sub[i]->update(&_dist_sensor_time[i], &dist_sensor)) {
 
-			switch (dist_sensor.type) {
-			case MAV_DISTANCE_SENSOR_ULTRASOUND:
-				msg.type = MAV_DISTANCE_SENSOR_ULTRASOUND;
-				break;
+				mavlink_distance_sensor_t msg = {};
 
-			case MAV_DISTANCE_SENSOR_LASER:
-				msg.type = MAV_DISTANCE_SENSOR_LASER;
-				break;
+				msg.time_boot_ms = dist_sensor.timestamp / 1000; // us to ms
 
-			case MAV_DISTANCE_SENSOR_INFRARED:
-				msg.type = MAV_DISTANCE_SENSOR_INFRARED;
-				break;
+				msg.id = dist_sensor.id;
 
-			default:
-				msg.type = MAV_DISTANCE_SENSOR_LASER;
-				break;
+				switch (dist_sensor.type) {
+				case MAV_DISTANCE_SENSOR_ULTRASOUND:
+					msg.type = MAV_DISTANCE_SENSOR_ULTRASOUND;
+					break;
+
+				case MAV_DISTANCE_SENSOR_LASER:
+					msg.type = MAV_DISTANCE_SENSOR_LASER;
+					break;
+
+				case MAV_DISTANCE_SENSOR_INFRARED:
+					msg.type = MAV_DISTANCE_SENSOR_INFRARED;
+					break;
+
+				default:
+					msg.type = MAV_DISTANCE_SENSOR_LASER;
+					break;
+				}
+
+				msg.orientation = dist_sensor.orientation;
+				msg.min_distance = dist_sensor.min_distance * 100.0f; // m to cm
+				msg.max_distance = dist_sensor.max_distance * 100.0f; // m to cm
+				msg.current_distance = dist_sensor.current_distance * 100.0f; // m to cm
+				msg.covariance = dist_sensor.covariance;
+
+				mavlink_msg_distance_sensor_send_struct(_mavlink->get_channel(), &msg);
+
+				sent |= true;
+
 			}
-
-			msg.orientation = dist_sensor.orientation;
-			msg.min_distance = dist_sensor.min_distance * 100.0f; /* m to cm */
-			msg.max_distance = dist_sensor.max_distance * 100.0f; /* m to cm */
-			msg.current_distance = dist_sensor.current_distance * 100.0f; /* m to cm */
-			msg.covariance = dist_sensor.covariance;
-
-			mavlink_msg_distance_sensor_send_struct(_mavlink->get_channel(), &msg);
-
-			return true;
 		}
 
-		return false;
+		return sent;
 	}
 };
 

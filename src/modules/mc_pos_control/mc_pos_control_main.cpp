@@ -1068,7 +1068,7 @@ MulticopterPositionControl::update_avoidance_waypoint_desired(PositionControlSta
 		states.acceleration.copyTo(_traj_wp_avoidance_desired.waypoints[vehicle_trajectory_waypoint_s::POINT_0].acceleration);
 
 		_traj_wp_avoidance_desired.waypoints[vehicle_trajectory_waypoint_s::POINT_0].yaw = states.yaw;
-		_traj_wp_avoidance_desired.waypoints[vehicle_trajectory_waypoint_s::POINT_0].yaw_speed = NAN;
+		_traj_wp_avoidance_desired.waypoints[vehicle_trajectory_waypoint_s::POINT_0].yaw_speed = setpoint.yawspeed;
 		_traj_wp_avoidance_desired.waypoints[vehicle_trajectory_waypoint_s::POINT_0].point_valid = true;
 
 		publish_avoidance_desired_waypoint();

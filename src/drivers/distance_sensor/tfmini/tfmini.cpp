@@ -170,7 +170,7 @@ private:
 extern "C" __EXPORT int tfmini_main(int argc, char *argv[]);
 
 TFMINI::TFMINI(const char *port, uint8_t rotation) :
-	CDev(RANGE_FINDER0_DEVICE_PATH),
+	CDev(RANGE_FINDER1_DEVICE_PATH),
 	_rotation(rotation),
 	_min_distance(0.30f),
 	_max_distance(12.0f),
@@ -585,8 +585,8 @@ TFMINI::collect()
 	report.max_distance = get_maximum_distance();
 	report.covariance = 0.0f;
 	report.signal_quality = -1;
-	/* TODO: set proper ID */
-	report.id = 0;
+	// TODO : hack
+	report.id = 1;
 
 	/* publish it */
 	orb_publish(ORB_ID(distance_sensor), _distance_sensor_topic, &report);

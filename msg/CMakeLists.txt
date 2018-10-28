@@ -121,6 +121,7 @@ set(msg_files
 	vehicle_air_data.msg
 	vehicle_attitude.msg
 	vehicle_attitude_setpoint.msg
+	vehicle_ackermann_setpoint.msg
 	vehicle_command.msg
 	vehicle_command_ack.msg
 	vehicle_constraints.msg

@@ -71,6 +71,7 @@
 #include <uORB/topics/transponder_report.h>
 #include <uORB/topics/vehicle_attitude.h>
 #include <uORB/topics/vehicle_attitude_setpoint.h>
+#include <uORB/topics/vehicle_ackermann_setpoint.h>
 #include <uORB/topics/vehicle_command.h>
 #include <uORB/topics/vehicle_control_mode.h>
 #include <uORB/topics/vehicle_gps_position.h>
@@ -247,7 +248,7 @@ private:
 	orb_advert_t _obstacle_distance_pub{nullptr};
 	orb_advert_t _offboard_control_mode_pub{nullptr};
 	orb_advert_t _ping_pub{nullptr};
-	orb_advert_t _pos_sp_triplet_pub{nullptr};
+	orb_advert_t _ackermann_sp_pub{nullptr};
 	orb_advert_t _radio_status_pub{nullptr};
 	orb_advert_t _rates_sp_pub{nullptr};
 	orb_advert_t _rc_pub{nullptr};

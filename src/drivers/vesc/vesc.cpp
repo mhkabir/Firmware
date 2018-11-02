@@ -50,7 +50,7 @@
 #include <uORB/uORB.h>
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_armed.h>
-#include <uORB/topics/esc_status.h>
+#include <uORB/topics/parameter_update.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
@@ -73,7 +73,7 @@
 /*
  * This driver connects to VESCs via serial.
  */
-class VESC : public cdev::CDev, public ModuleBase<VESC>
+class VESC : public cdev::CDev, public ModuleBase<VESC>, public ModuleParams
 {
 public:
 	VESC(char const *const device);
@@ -101,7 +101,7 @@ private:
 	char 			_device[DEVICE_ARGUMENT_MAX_LENGTH];
 	int 			_uart_fd = -1;
 	bool 			_is_armed = false;
-	int			_armed_sub = -1;
+	int				_armed_sub = -1;
 	int 			_params_sub = -1;
 	actuator_armed_s	_armed = {};
 
@@ -109,16 +109,25 @@ private:
 	actuator_controls_s	_control;
 	px4_pollfd_struct_t	_poll_fd;
 
-	orb_advert_t      _esc_feedback_pub = nullptr;
-	esc_status_s      _esc_feedback = {};
-
 	void subscribe();
 	void send_current_setpoint(float current);
 	void send_steering_setpoint(float angle);
+
+	void update_params(bool force = false);
+
+	/** @note Declare local parameters using defined parameters. */
+	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::VESC_MAX_CURRENT>)  _p_max_current,
+		(ParamFloat<px4::params::VESC_ANGLE_TRIM>)  _p_angle_trim,
+		(ParamFloat<px4::params::VESC_ANGLE_MIN>)  _p_angle_min,
+		(ParamFloat<px4::params::VESC_ANGLE_MAX>)  _p_angle_max
+	)
+
 };
 
 VESC::VESC(char const *const device):
 	CDev(VESC_DEVICE_PATH),
+	ModuleParams(nullptr),
 	_control_sub(-1)
 {
 	strncpy(_device, device, sizeof(_device));
@@ -130,8 +139,7 @@ VESC::~VESC()
 {
 	orb_unsubscribe(_control_sub);
 	orb_unsubscribe(_armed_sub);
-
-	orb_unadvertise(_esc_feedback_pub);
+	orb_unsubscribe(_params_sub);
 
 	vesc_common::deinitialise_uart(_uart_fd);
 
@@ -209,12 +217,13 @@ int VESC::init()
 	/* do regular cdev init */
 	ret = CDev::init();
 
-	_esc_feedback_pub = orb_advertise(ORB_ID(esc_status), &_esc_feedback);
-
 	_armed_sub = orb_subscribe(ORB_ID(actuator_armed));
 	_control_sub = orb_subscribe(ORB_ID(actuator_controls_0));
+	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 
 	orb_set_interval(_control_sub, VESC_CTRL_UORB_UPDATE_INTERVAL);
+
+	update_params(true);
 
 	_poll_fd.fd = _control_sub;
 	_poll_fd.events = POLLIN;
@@ -225,11 +234,11 @@ int VESC::init()
 void VESC::send_current_setpoint(float current)
 {
 	// Clip setpoints
-	if (current > CURRENT_MAX) {
-		current = CURRENT_MAX;
+	if (current > _p_max_current.get()) {
+		current = _p_max_current.get();
 
-	} else if (current < -CURRENT_MAX) {
-		current = -CURRENT_MAX;
+	} else if (current < -_p_max_current.get()) {
+		current = -_p_max_current.get();
 	}
 
 	// Create packet payload
@@ -277,15 +286,22 @@ void VESC::cycle()
 	} else if (_poll_fd.revents & POLLIN) {
 		orb_copy(ORB_ID(actuator_controls_0), _control_sub, &_control);
 
-		float current_sp = _control.control[actuator_controls_s::INDEX_THROTTLE] * CURRENT_MAX;
-		float steering_sp = _control.control[actuator_controls_s::INDEX_YAW];
-
-		send_current_setpoint(current_sp);
+		float yaw_target = _control.control[actuator_controls_s::INDEX_YAW];
+		float steering_sp = _p_angle_trim.get();
+		if(yaw_target < 0.0f) {
+			// Map -1 to 0 from angle_min to angle_trim
+			steering_sp = _p_angle_min.get() + ((_p_angle_trim.get() - _p_angle_min.get()) * (yaw_target + 1.0f));
+		} else if (yaw_target > 0.0f) {
+			// Map 0 to 1 from angle_trim to angle_max
+			steering_sp = _p_angle_trim.get() + ((_p_angle_max.get() - _p_angle_trim.get()) * yaw_target);
+		}
 		send_steering_setpoint(steering_sp);
+
+		float current_sp = _control.control[actuator_controls_s::INDEX_THROTTLE] * _p_max_current.get();
+		send_current_setpoint(current_sp);
 	}
 
 	bool updated;
-
 	orb_check(_armed_sub, &updated);
 
 	if (updated) {
@@ -294,6 +310,21 @@ void VESC::cycle()
 		_is_armed = _armed.armed;
 	}
 
+	update_params(false);
+
+}
+
+void VESC::update_params(const bool force)
+{
+	bool updated;
+	parameter_update_s param_update;
+
+	orb_check(_params_sub, &updated);
+
+	if (updated || force) {
+		ModuleParams::updateParams();
+		orb_copy(ORB_ID(parameter_update), _params_sub, &param_update);
+	}
 }
 
 /** @see ModuleBase */

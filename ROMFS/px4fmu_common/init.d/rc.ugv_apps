@@ -19,6 +19,7 @@ ekf2 start
 #gnd_att_control start
 #gnd_pos_control start
 vesc start -d /dev/ttyS2
+gnd_ackermann_control start
 
 #
 # Start Land Detector.

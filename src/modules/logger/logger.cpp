@@ -645,6 +645,7 @@ void Logger::add_default_topics()
 	add_topic("vehicle_air_data", 200);
 	add_topic("vehicle_attitude", 30);
 	add_topic("vehicle_attitude_setpoint", 100);
+	add_topic("vehicle_body_state");
 	add_topic("vehicle_command");
 	add_topic("vehicle_global_position", 200);
 	add_topic("vehicle_gps_position");

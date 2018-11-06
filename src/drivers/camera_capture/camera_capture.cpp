@@ -52,6 +52,7 @@ CameraCapture::CameraCapture() :
 	_trigger_pub(nullptr),
 	_command_ack_pub(nullptr),
 	_command_sub(-1),
+	_capture_edge{},
 	_capture_enabled{},
 	_capture_overflows{},
 	_capture_seq{},
@@ -59,6 +60,8 @@ CameraCapture::CameraCapture() :
 	_last_exposure_time{},
 	_time_offset(0.0) // in seconds
 {
+	_capture_edge[0] = 1; // rising
+	_capture_edge[1] = 2; // both
 
 	memset(&_work, 0, sizeof(_work));
 
@@ -77,22 +80,40 @@ CameraCapture::capture_callback(uint32_t chan_index,
 {
 	uint8_t cam_id = chan_index - PIN_BASE;
 
-	if (edge_state == 0) {											// Falling edge
-		// Timestamp it
-		_last_fall_time[cam_id] = edge_time;
+	uint64_t capture_timestamp = 0;
 
-	} else if (edge_state == 1 && _last_fall_time[cam_id] > 0) {			// Rising edge and got falling before
+	if (edge_state == 0) {											// Falling edge
+
+		if (_capture_edge[cam_id] == 2) {
+			_last_fall_time[cam_id] = edge_time;
+
+		} else if (_capture_edge[cam_id] == 0) {
+			capture_timestamp = edge_time;
+		}
+
+	} else if (edge_state == 1) {			// Rising edge
+
+		if (_capture_edge[cam_id] == 2 && (_last_fall_time[cam_id] > 0)) { 	// Got falling edge before
+			// Calculate exposure time
+			_last_exposure_time[cam_id] = edge_time - _last_fall_time[cam_id];
+
+			// Calculated exposure time compensated timestamp
+			capture_timestamp = edge_time - (_last_exposure_time[cam_id] / 2);
+
+		} else if (_capture_edge[cam_id] == 1) {
+			capture_timestamp = edge_time;
+		}
+	}
+
+	if (capture_timestamp > 0) {
+		// TODO : don't do this from ISR
 		struct camera_trigger_s	trigger {};
 
-		// Calculate exposure time
-		_last_exposure_time[cam_id] = edge_time - _last_fall_time[cam_id];
-
-		trigger.timestamp = edge_time - (_last_exposure_time[cam_id] / 2); //+ uint64_t(_time_offset * 1000000.0f);	// Get timestamp of mid-exposure
+		trigger.timestamp = capture_timestamp;
 		trigger.camera_id = cam_id;
 		trigger.seq = _capture_seq[cam_id]++;
 
 		orb_publish(ORB_ID(camera_trigger), _trigger_pub, &trigger);
-
 	}
 
 	_capture_overflows[cam_id] = overflow;
@@ -179,7 +200,7 @@ CameraCapture::set_capture_control(uint8_t cam_id, bool enable, bool reset_seq)
 	if (enable && !_capture_enabled[cam_id]) {
 		// Enable signal capture
 		reset_statistics(cam_id, reset_seq);
-		up_input_capture_set(pin, Both, 0, &CameraCapture::capture_trampoline, this);
+		up_input_capture_set(pin, (input_capture_edge)(_capture_edge[cam_id] + 1), 0, &CameraCapture::capture_trampoline, this);
 
 		_capture_enabled[cam_id] = true;
 
@@ -228,11 +249,16 @@ CameraCapture::status()
 {
 	for (uint8_t cam_id = 0; cam_id < NUM_CAMERAS; cam_id++) {
 		PX4_INFO("Camera %u status :", cam_id);
+		PX4_INFO("  Capturing %s edge", _capture_edge[cam_id] > 1 ? "both" : (_capture_edge[cam_id] == 0 ? "falling" :
+				"rising"));
 		PX4_INFO("  Capture enabled : %s", _capture_enabled[cam_id] ? "YES" : "NO");
 		PX4_INFO("  Number of overflows : %u", _capture_overflows[cam_id]);
 		PX4_INFO("  Frame sequence : %u", _capture_seq[cam_id]);
-		PX4_INFO("  Last fall timestamp : %llu", _last_fall_time[cam_id]);
-		PX4_INFO("  Last exposure time : %0.2f ms", double(_last_exposure_time[cam_id]) / 1000.0);
+
+		if (_capture_edge[cam_id] > 1) {
+			PX4_INFO("  Last fall timestamp : %llu", _last_fall_time[cam_id]);
+			PX4_INFO("  Last exposure time : %0.2f ms", double(_last_exposure_time[cam_id]) / 1000.0);
+		}
 	}
 }
 

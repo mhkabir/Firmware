@@ -66,6 +66,7 @@
 #include <uORB/topics/sensor_selection.h>
 #include <uORB/topics/vehicle_air_data.h>
 #include <uORB/topics/vehicle_attitude.h>
+#include <uORB/topics/vehicle_body_state.h>
 #include <uORB/topics/vehicle_global_position.h>
 #include <uORB/topics/vehicle_gps_position.h>
 #include <uORB/topics/vehicle_land_detected.h>
@@ -271,6 +272,7 @@ private:
 	orb_advert_t _ekf2_timestamps_pub{nullptr};
 	orb_advert_t _sensor_bias_pub{nullptr};
 	orb_advert_t _blended_gps_pub{nullptr};
+	orb_advert_t _body_state_pub{nullptr};
 
 	uORB::Publication<vehicle_local_position_s> _vehicle_local_position_pub;
 	uORB::Publication<vehicle_global_position_s> _vehicle_global_position_pub;
@@ -1283,6 +1285,7 @@ void Ekf2::run()
 
 			// only publish position after successful alignment
 			if (control_status.flags.tilt_align) {
+
 				// generate vehicle local position data
 				vehicle_local_position_s &lpos = _vehicle_local_position_pub.get();
 
@@ -1459,6 +1462,73 @@ void Ekf2::run()
 
 				} else {
 					orb_publish(ORB_ID(sensor_bias), _sensor_bias_pub, &bias);
+				}
+			}
+
+			{
+				if (!_ekf.attitude_valid()) {
+					return;
+				}
+
+				// Get quantities of interest
+				float gyro_bias[3];
+				_ekf.get_gyro_bias(gyro_bias);
+				float accel_bias[3];
+				_ekf.get_accel_bias(accel_bias);
+				float vel[3];
+				_ekf.get_velocity(vel);
+				matrix::Quatf q_att;
+				_ekf.copy_quaternion(q_att.data());
+
+				// Generate body frame state
+				vehicle_body_state_s bstate {};
+
+				bstate.timestamp = now;
+
+				// Body frame angular velocity estimate
+				// Correct raw gyro data for bias
+				bstate.rollspeed = sensors.gyro_rad[0] - gyro_bias[0];
+				bstate.pitchspeed = sensors.gyro_rad[1] - gyro_bias[1];
+				bstate.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
+
+				// Body frame velocity estimate
+				if (_ekf.local_position_is_valid()) {
+					// Rotate velocity vector to body frame using attitude estimate
+					matrix::Vector3f velocity {vel[0], vel[1], vel[2]};
+					velocity = q_att.conjugate_inversed(velocity);
+					bstate.vx = velocity(0);
+					bstate.vy = velocity(1);
+					bstate.vz = velocity(2);
+
+				} else {
+					bstate.vx = NAN;
+					bstate.vy = NAN;
+					bstate.vz = NAN;
+				}
+
+				// Body frame acceleration estimate
+				// Correct raw accelerometer data for bias
+				Vector3f accel_meas;
+				accel_meas(0) = sensors.accelerometer_m_s2[0] - accel_bias[0];
+				accel_meas(1) = sensors.accelerometer_m_s2[1] - accel_bias[1];
+				accel_meas(2) = sensors.accelerometer_m_s2[2] - accel_bias[2];
+
+				// Rotate gravity vector to body frame using attitude estimate
+				matrix::Vector3f gravity{0.0f, 0.0f, -9.81};
+				gravity = q_att.conjugate_inversed(gravity);
+
+				// Subtract gravity
+				accel_meas -= gravity;
+
+				bstate.ax = accel_meas(0);
+				bstate.ay = accel_meas(1);
+				bstate.az = accel_meas(2);
+
+				if (_body_state_pub == nullptr) {
+					_body_state_pub = orb_advertise(ORB_ID(vehicle_body_state), &bstate);
+
+				} else {
+					orb_publish(ORB_ID(vehicle_body_state), _body_state_pub, &bstate);
 				}
 			}
 

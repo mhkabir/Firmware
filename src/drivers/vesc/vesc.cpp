@@ -110,14 +110,16 @@ private:
 	px4_pollfd_struct_t	_poll_fd;
 
 	void subscribe();
-	void send_current_setpoint(float current);
-	void send_steering_setpoint(float angle);
+	void send_current_sp(float current);
+	void send_brake_current_sp(float current);
+	void send_steering_sp(float angle);
 
 	void update_params(bool force = false);
 
 	/** @note Declare local parameters using defined parameters. */
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::VESC_MAX_CURRENT>)  _p_max_current,
+		(ParamFloat<px4::params::VESC_BRK_CURRENT>)  _p_max_braking_current,
 		(ParamFloat<px4::params::VESC_ANGLE_TRIM>)  _p_angle_trim,
 		(ParamFloat<px4::params::VESC_ANGLE_MIN>)  _p_angle_min,
 		(ParamFloat<px4::params::VESC_ANGLE_MAX>)  _p_angle_max
@@ -231,21 +233,13 @@ int VESC::init()
 	return ret;
 }
 
-void VESC::send_current_setpoint(float current)
+void VESC::send_current_sp(float current)
 {
-	// Clip setpoints
-	if (current > _p_max_current.get()) {
-		current = _p_max_current.get();
-
-	} else if (current < -_p_max_current.get()) {
-		current = -_p_max_current.get();
-	}
-
 	// Create packet payload
 	int32_t index = 0;
 	uint8_t payload[5];
 
-	payload[index++] = COMM_SET_CURRENT ;
+	payload[index++] = COMM_SET_CURRENT;
 	vesc_common::buffer_append_int32(payload, int32_t(current * 1000), &index);
 
 	// Send packet
@@ -256,7 +250,24 @@ void VESC::send_current_setpoint(float current)
 	}
 }
 
-void VESC::send_steering_setpoint(float angle)
+void VESC::send_brake_current_sp(float current)
+{
+	// Create packet payload
+	int32_t index = 0;
+	uint8_t payload[5];
+
+	payload[index++] = COMM_SET_CURRENT_BRAKE ;
+	vesc_common::buffer_append_int32(payload, int32_t(current * 1000), &index);
+
+	// Send packet
+	int ret = vesc_common::send_payload(_uart_fd, payload, 5);
+
+	if (ret < 1) {
+		PX4_ERR("TX ERROR: ret: %d, errno: %d", ret, errno);
+	}
+}
+
+void VESC::send_steering_sp(float angle)
 {
 	// Create packet payload
 	int32_t index = 0;
@@ -286,19 +297,30 @@ void VESC::cycle()
 	} else if (_poll_fd.revents & POLLIN) {
 		orb_copy(ORB_ID(actuator_controls_0), _control_sub, &_control);
 
+		// Yaw is normalized [-1, 1]
 		float yaw_target = _control.control[actuator_controls_s::INDEX_YAW];
 		float steering_sp = _p_angle_trim.get();
-		if(yaw_target < 0.0f) {
+
+		if (yaw_target < 0.0f) {
 			// Map -1 to 0 from angle_min to angle_trim
 			steering_sp = _p_angle_min.get() + ((_p_angle_trim.get() - _p_angle_min.get()) * (yaw_target + 1.0f));
+
 		} else if (yaw_target > 0.0f) {
 			// Map 0 to 1 from angle_trim to angle_max
 			steering_sp = _p_angle_trim.get() + ((_p_angle_max.get() - _p_angle_trim.get()) * yaw_target);
 		}
-		send_steering_setpoint(steering_sp);
 
+		send_steering_sp(steering_sp);
+
+		// Throttle is normalized [-1, 1]
 		float current_sp = _control.control[actuator_controls_s::INDEX_THROTTLE] * _p_max_current.get();
-		send_current_setpoint(current_sp);
+		send_current_sp(current_sp);
+
+		// Brake is normalized [0, 1]
+		if(_control.control[actuator_controls_s::INDEX_AIRBRAKES] > 0.0f) {
+			float braking_current_sp = -_control.control[actuator_controls_s::INDEX_AIRBRAKES] * _p_max_braking_current.get();
+			send_brake_current_sp(braking_current_sp);
+		}
 	}
 
 	bool updated;

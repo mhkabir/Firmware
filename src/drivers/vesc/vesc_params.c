@@ -49,6 +49,16 @@
 PARAM_DEFINE_FLOAT(VESC_MAX_CURRENT, 10.0f);
 
 /**
+ * Maximum braking current to deliver to the motor
+ *
+ * @group VESC
+ * @min 0.0
+ * @max 100.0
+ * @unit A
+ */
+PARAM_DEFINE_FLOAT(VESC_BRK_CURRENT, 10.0f);
+
+/**
  * Normalized angle setpoint for which servo is centered
  *
  * @group VESC

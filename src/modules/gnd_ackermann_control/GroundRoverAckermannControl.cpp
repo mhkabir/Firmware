@@ -237,12 +237,26 @@ GroundRoverAckermannControl::task_main()
 			actuator_controls_s	actuator_outputs{};
 
 			// Only send outputs if setpoints aren't stale
-			if(hrt_absolute_time() - _ackermann_sp.timestamp < 100000) { // 100ms
+			if (hrt_absolute_time() - _ackermann_sp.timestamp < 100000) { // 100ms
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = _ackermann_sp.steering_angle;
-				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] =_ackermann_sp.speed;
+
+				if (PX4_ISFINITE(_ackermann_sp.speed)) {
+					actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = _ackermann_sp.speed;
+
+					// Braking
+					if (fabsf(_ackermann_sp.speed) < FLT_EPSILON) {
+						actuator_outputs.control[actuator_controls_s::INDEX_AIRBRAKES] = 1.0f;
+					}
+
+				} else {
+					// NaN
+					actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
+				}
+
 			} else {
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = 0.0f;
 				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
+				actuator_outputs.control[actuator_controls_s::INDEX_AIRBRAKES] = 1.0f;
 			}
 
 			actuator_outputs.timestamp = hrt_absolute_time();

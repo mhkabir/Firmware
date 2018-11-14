@@ -725,10 +725,10 @@ void Logger::add_thermal_calibration_topics()
 
 void Logger::add_sensor_comparison_topics()
 {
-	add_topic("sensor_accel", 100);
-	add_topic("sensor_baro", 100);
-	add_topic("sensor_gyro", 100);
-	add_topic("sensor_mag", 100);
+	add_topic("sensor_accel");
+	add_topic("sensor_baro");
+	add_topic("sensor_gyro");
+	add_topic("sensor_mag");
 }
 
 void Logger::add_vision_and_avoidance_topics()

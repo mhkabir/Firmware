@@ -102,6 +102,7 @@ set(config_module_list
 	#
 	modules/dataman
 	modules/landing_target_estimator
+	modules/landing_target_ekf
 
 	#
 	# OBC challenge

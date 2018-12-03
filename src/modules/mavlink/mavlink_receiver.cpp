@@ -152,7 +152,7 @@ MavlinkReceiver::MavlinkReceiver(Mavlink *parent) :
 	_trajectory_waypoint_pub(nullptr),
 	_land_detector_pub(nullptr),
 	_follow_target_pub(nullptr),
-	_landing_target_pose_pub(nullptr),
+	_landing_target_pub(nullptr),
 	_transponder_report_pub(nullptr),
 	_collision_report_pub(nullptr),
 	_debug_key_value_pub(nullptr),
@@ -2198,19 +2198,18 @@ void MavlinkReceiver::handle_message_landing_target(mavlink_message_t *msg)
 
 	mavlink_msg_landing_target_decode(msg, &landing_target);
 
-	if (landing_target.position_valid && landing_target.frame == MAV_FRAME_LOCAL_NED) {
-		landing_target_pose_s landing_target_pose = {};
-		landing_target_pose.timestamp = _mavlink_timesync.sync_stamp(landing_target.time_usec);
-		landing_target_pose.abs_pos_valid = true;
-		landing_target_pose.x_abs = landing_target.x;
-		landing_target_pose.y_abs = landing_target.y;
-		landing_target_pose.z_abs = landing_target.z;
+	if (landing_target.position_valid && landing_target.frame == MAV_FRAME_BODY_FRD) {
+		landing_target_detection_s target_detection {};
+		target_detection.timestamp = _mavlink_timesync.sync_stamp(landing_target.time_usec);
+		target_detection.x = landing_target.x;
+		target_detection.y = landing_target.y;
+		target_detection.z = landing_target.z;
 
-		if (_landing_target_pose_pub == nullptr) {
-			_landing_target_pose_pub = orb_advertise(ORB_ID(landing_target_pose), &landing_target_pose);
+		if (_landing_target_pub == nullptr) {
+			_landing_target_pub = orb_advertise(ORB_ID(landing_target_detection), &target_detection);
 
 		} else {
-			orb_publish(ORB_ID(landing_target_pose), _landing_target_pose_pub, &landing_target_pose);
+			orb_publish(ORB_ID(landing_target_detection), _landing_target_pub, &target_detection);
 		}
 	}
 }

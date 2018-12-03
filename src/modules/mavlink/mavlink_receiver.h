@@ -57,7 +57,7 @@
 #include <uORB/topics/follow_target.h>
 #include <uORB/topics/gps_inject_data.h>
 #include <uORB/topics/home_position.h>
-#include <uORB/topics/landing_target_pose.h>
+#include <uORB/topics/landing_target_detection.h>
 #include <uORB/topics/manual_control_setpoint.h>
 #include <uORB/topics/obstacle_distance.h>
 #include <uORB/topics/offboard_control_mode.h>
@@ -235,7 +235,7 @@ private:
 	orb_advert_t _trajectory_waypoint_pub;
 	orb_advert_t _land_detector_pub;
 	orb_advert_t _follow_target_pub;
-	orb_advert_t _landing_target_pose_pub;
+	orb_advert_t _landing_target_pub;
 	orb_advert_t _transponder_report_pub;
 	orb_advert_t _collision_report_pub;
 	orb_advert_t _debug_key_value_pub;

@@ -891,10 +891,15 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 	vehicle_ackermann_setpoint_s ackermann_sp {};
 
 	ackermann_sp.timestamp = hrt_absolute_time();
+
+	// Enable autonomous control only if magic key matches
+	ackermann_sp.manual_passthrough = (set_position_target_local_ned.type_mask != 45915);
+
 	ackermann_sp.steering_angle = set_position_target_local_ned.yaw;
 	ackermann_sp.steering_angle_velocity = set_position_target_local_ned.yaw_rate;
 	ackermann_sp.speed = set_position_target_local_ned.vx;
 	ackermann_sp.acceleration = set_position_target_local_ned.afx;
+	ackermann_sp.jerk = NAN;
 
 	if (_ackermann_sp_pub == nullptr) {
 		_ackermann_sp_pub = orb_advertise(ORB_ID(vehicle_ackermann_setpoint),

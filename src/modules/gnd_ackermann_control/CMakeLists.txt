@@ -37,4 +37,6 @@ px4_add_module(
 	COMPILE_FLAGS
 	SRCS
 		GroundRoverAckermannControl.cpp
+	DEPENDS
+		pid
 	)

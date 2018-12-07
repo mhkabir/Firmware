@@ -32,13 +32,7 @@
  ****************************************************************************/
 
 /**
- *
- * This module is a modification of the fixed wing module and it is designed for ground rovers.
- * It has been developed starting from the fw module, simplified and improved with dedicated items.
- *
- * All the acknowledgments and credits for the fw wing app are reported in those files.
- *
- * @author Marco Zorzi <mzorzi@student.ethz.ch>
+ * @author Mohammed Kabir <mhkabir@mit.edu>
  */
 
 #include "GroundRoverAckermannControl.hpp"
@@ -53,25 +47,27 @@ GroundRoverAckermannControl	*g_control = nullptr;
 GroundRoverAckermannControl::GroundRoverAckermannControl() :
 	/* performance counters */
 	_loop_perf(perf_alloc(PC_ELAPSED, "gnda_dt")),
-
 	_nonfinite_input_perf(perf_alloc(PC_COUNT, "gnda_nani")),
 	_nonfinite_output_perf(perf_alloc(PC_COUNT, "gnda_nano"))
 {
-	// Steering rate control
-	_parameter_handles.w_p = param_find("GND_WR_P");
-	_parameter_handles.w_i = param_find("GND_WR_I");
-	_parameter_handles.w_d = param_find("GND_WR_D");
-	_parameter_handles.w_imax = param_find("GND_WR_IMAX");
+	// Vehicle dynamic limits
+	_parameter_handles.v_max = param_find("RAC_VEL_MAX");
+	_parameter_handles.a_max = param_find("RAC_ACC_MAX");
+	_parameter_handles.s_max = param_find("RAC_STEER_MAX");
+
+	// Velocity control
+	_parameter_handles.v_p = param_find("RAC_VEL_P");
 
 	// Acceleration control
-	_parameter_handles.a_p = param_find("GND_A_P");
-	_parameter_handles.a_i = param_find("GND_A_I");
-	_parameter_handles.a_d = param_find("GND_A_D");
-	_parameter_handles.a_imax = param_find("GND_A_IMAX");
+	_parameter_handles.a_p = param_find("RAC_ACC_P");
+	_parameter_handles.a_i = param_find("RAC_ACC_I");
+	_parameter_handles.a_d = param_find("RAC_ACC_D");
+	_parameter_handles.a_imax = param_find("RAC_ACC_IMAX");
 
+	// Battery drop compensation
 	_parameter_handles.bat_scale_en = param_find("GND_BAT_SCALE_EN");
 
-	/* fetch initial parameter values */
+	// Fetch initial parameter values
 	parameters_update();
 }
 
@@ -107,22 +103,35 @@ GroundRoverAckermannControl::~GroundRoverAckermannControl()
 void
 GroundRoverAckermannControl::parameters_update()
 {
-	param_get(_parameter_handles.w_p, &(_parameters.w_p));
-	param_get(_parameter_handles.w_i, &(_parameters.w_i));
-	param_get(_parameter_handles.w_d, &(_parameters.w_d));
-	param_get(_parameter_handles.w_imax, &(_parameters.w_imax));
+
+	param_get(_parameter_handles.v_max, &(_parameters.v_max));
+	param_get(_parameter_handles.a_max, &(_parameters.a_max));
+	param_get(_parameter_handles.s_max, &(_parameters.s_max));
+
+	param_get(_parameter_handles.v_p, &(_parameters.v_p));
+
+	param_get(_parameter_handles.a_p, &(_parameters.a_p));
+	param_get(_parameter_handles.a_i, &(_parameters.a_i));
+	param_get(_parameter_handles.a_d, &(_parameters.a_d));
+	param_get(_parameter_handles.a_imax, &(_parameters.a_imax));
 
 	param_get(_parameter_handles.bat_scale_en, &_parameters.bat_scale_en);
 
-	/* Steering pid parameters
+	pid_init(&_acceleration_ctrl, PID_MODE_DERIVATIV_CALC, 0.01f);
+	pid_set_parameters(&_acceleration_ctrl,
+			   _parameters.a_p,
+			   _parameters.a_i,
+			   _parameters.a_d,
+			   _parameters.a_imax,
+			   1.0f);
 
-	pid_init(&_steering_ctrl, PID_MODE_DERIVATIV_SET, 0.01f);
-	pid_set_parameters(&_steering_ctrl,
-			   _parameters.w_p,
-			   _parameters.w_i,
-			   _parameters.w_d,
-			   _parameters.w_imax,
-			   1.0f);*/
+	pid_init(&_velocity_ctrl, PID_MODE_DERIVATIV_SET, 0.01f);
+	pid_set_parameters(&_velocity_ctrl,
+			   _parameters.v_p,
+			   0.0f,
+			   0.0f,
+			   0.0f,
+			   _parameters.a_max);
 }
 
 void
@@ -162,24 +171,22 @@ GroundRoverAckermannControl::task_main()
 	_ackermann_sp_sub = orb_subscribe(ORB_ID(vehicle_ackermann_setpoint));
 
 	// State feedback
-	_imu_sub = orb_subscribe(ORB_ID(sensor_bias));
+	_state_sub = orb_subscribe(ORB_ID(vehicle_body_state));
 
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
 	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
 
 	parameters_update();
 
-	/* get an initial update for all sensor and status data */
+	// Get an initial update for all sensor and status data
 	vehicle_ackermann_setpoint_poll();
 	battery_status_poll();
 
-	/* wakeup source */
+	// Wakeup sources
 	px4_pollfd_struct_t fds[2];
-
-	/* Setup of loop */
 	fds[0].fd = _params_sub;
 	fds[0].events = POLLIN;
-	fds[1].fd = _imu_sub;
+	fds[1].fd = _state_sub;
 	fds[1].events = POLLIN;
 
 	_task_running = true;
@@ -212,55 +219,95 @@ GroundRoverAckermannControl::task_main()
 			parameters_update();
 		}
 
-		/* only run controller if IMU changed */
+		/* only run controller if body state changed */
 		if (fds[1].revents & POLLIN) {
 
-			/*
-			static uint64_t last_run = 0;
-			float deltaT = (hrt_absolute_time() - last_run) / 1000000.0f;
-			last_run = hrt_absolute_time();
+			float delta_t = (hrt_absolute_time() - _timestamp_last) / 1000000.0f;
+			_timestamp_last = hrt_absolute_time();
 
-			// Guard against too large deltaT's
-			if (deltaT > 1.0f ||
-			    fabsf(deltaT) < 0.00001f ||
-			    !PX4_ISFINITE(deltaT)) {
-				deltaT = 0.01f;
-			}*/
+			// Guard against extreme dts
+			if (delta_t > 1.0f || fabsf(delta_t) < 0.00001f || !PX4_ISFINITE(delta_t)) {
+				PX4_WARN("Extreme dt!");
+				delta_t = 0.01f;
+			}
 
 			/* load local copies */
-			orb_copy(ORB_ID(sensor_bias), _imu_sub, &_imu);
+			vehicle_body_state_s state;
+			orb_copy(ORB_ID(vehicle_body_state), _state_sub, &state);
 
 			vehicle_ackermann_setpoint_poll();
 			battery_status_poll();
 
-			// Run controller
 			actuator_controls_s	actuator_outputs{};
 
-			// Only send outputs if setpoints aren't stale
-			if (hrt_absolute_time() - _ackermann_sp.timestamp < 100000) { // 100ms
-				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = _ackermann_sp.steering_angle;
+			// Run controller if under autonomous control
+			if (!_ackermann_sp.manual_passthrough &&
+			    PX4_ISFINITE(_ackermann_sp.acceleration) &&
+			    PX4_ISFINITE(state.ax)) {
 
-				if (PX4_ISFINITE(_ackermann_sp.speed)) {
-					actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = _ackermann_sp.speed;
+				float acceleration_sp = _ackermann_sp.acceleration;
 
-					// Braking
-					if (fabsf(_ackermann_sp.speed) < FLT_EPSILON) {
-						actuator_outputs.control[actuator_controls_s::INDEX_AIRBRAKES] = 1.0f;
-					}
+				// If needed, run velocity controller first to generate acceleration setpoint
+				if (PX4_ISFINITE(_ackermann_sp.speed) && PX4_ISFINITE(state.vx)) {
 
-				} else {
-					// NaN
-					actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
+					// TODO constrain velocity setpoint before use
+					acceleration_sp = pid_calculate(&_velocity_ctrl, _ackermann_sp.speed, state.vx, state.ax, delta_t);
+
+					// TODO : Limit acceleration demand
+					/*
+					if(PX4_ISFINITE(_ackermann_sp.acceleration)) {
+						 if(x < a) {
+					        return a;
+					    }
+					    else if(b < x) {
+					        return b;
+					    }
+					    else
+					        return x;
+					}*/
 				}
 
-			} else {
+				// Run acceleration controller to generate torque setpoint
+				float torque_sp = pid_calculate(&_acceleration_ctrl, acceleration_sp, state.ax, 0.0f, delta_t);
+				// TODO : add jerk limits
+
+				// Steering
+				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = _ackermann_sp.steering_angle; // TODO
+
+				// Torque
+				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = torque_sp;
+
+				// TODO : handle braking
+				// if moving forward, desired torque is backward, apply brakes
+				// if moving backwards, desired torque is forward, apply brakes
+				// Needs testing to see if setting negative current setpoint applies proportional brake,
+				// or a hard brake. If hard, then needs explicit brake torque setting via actuator_controls_s::INDEX_AIRBRAKES.
+
+			} else if (_ackermann_sp.manual_passthrough) {
+
+				// Steering
+				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = _ackermann_sp.steering_angle;
+
+				// Torque
+				if (PX4_ISFINITE(_ackermann_sp.acceleration)) {
+					actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = _ackermann_sp.acceleration;
+
+					// Braking
+					if (fabsf(_ackermann_sp.acceleration) < FLT_EPSILON) {
+						actuator_outputs.control[actuator_controls_s::INDEX_AIRBRAKES] = 1.0f;
+					}
+				}
+			}
+
+			// If setpoints are stale, stop and brake
+			if (hrt_absolute_time() - _ackermann_sp.timestamp > 100000) { // 100ms
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = 0.0f;
-				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
-				actuator_outputs.control[actuator_controls_s::INDEX_AIRBRAKES] = 1.0f;
+ 				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = 0.0f;
+ 				actuator_outputs.control[actuator_controls_s::INDEX_AIRBRAKES] = 1.0f;
 			}
 
 			actuator_outputs.timestamp = hrt_absolute_time();
-			actuator_outputs.timestamp_sample = _imu.timestamp;
+			actuator_outputs.timestamp_sample = state.timestamp;
 
 			/* publish the actuator controls */
 			if (_actuators_pub != nullptr) {
@@ -274,10 +321,9 @@ GroundRoverAckermannControl::task_main()
 		perf_end(_loop_perf);
 	}
 
-	PX4_WARN("Exiting.\n");
-
 	_control_task = -1;
 	_task_running = false;
+
 }
 
 int

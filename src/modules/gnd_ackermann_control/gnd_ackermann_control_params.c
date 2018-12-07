@@ -32,58 +32,88 @@
  ****************************************************************************/
 
 /**
- * Maximum angle of virtual steering wheel
+ * Maximum lateral velocity that can be commanded (magnitude)
+ *
+ * @unit m/s
+ * @min 0.0
+ * @max 30.0
+ * @group Ground Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_VEL_MAX, 10.0f);
+
+/**
+ * Maximum lateral acceleration that can be commanded (magnitude)
+ *
+ * @unit m/s^2
+ * @min 0.0
+ * @max 10.0
+ * @group Ground Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_ACC_MAX, 1.0f);
+
+/**
+ * Maximum angle of virtual steering wheel (magnitude)
  *
  * @unit rad
  * @min 0.0
  * @max 1.57
  * @group Ground Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(GND_ACK_AMAX, 0.52f);
-
+PARAM_DEFINE_FLOAT(RAC_STEER_MAX, 0.52f);
 
 /**
- * Wheel steering rate proportional gain
+ * Velocity controller proportional gain
  *
- * This defines how much the wheel steering input will be commanded depending on the
- * current body angular rate error.
+ * This defines how much acceleration will be commanded depending on the
+ * current velocity error.
  *
- * @unit %/rad/s
+ * @unit (m/s^2)/(m/s)
  * @min 0.005
  * @max 1.0
  * @decimal 3
  * @increment 0.005
- * @group GND Attitude Control
+ * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(GND_WR_P, 1.0f);
+PARAM_DEFINE_FLOAT(RAC_VEL_P, 1.0f);
 
 /**
- * Wheel steering rate integrator gain
+ * Acceleration controller proportional gain
  *
- * This gain defines how much control response will result out of a steady
- * state error. It trims any constant error.
+ * This defines how much torque will be commanded depending on the
+ * current acceleration error.
+ *
+ * @unit %/(m/s^2)
+ * @min 0.005
+ * @max 1.0
+ * @decimal 3
+ * @increment 0.005
+ * @group Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_ACC_P, 1.0f);
+
+/**
+ * Acceleration controller integrator gain
  *
  * @unit %/rad
- * @min 0.00
+ * @min 0.0
  * @max 0.5
  * @decimal 3
  * @increment 0.005
- * @group GND Attitude Control
+ * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(GND_WR_I, 0.00f);
+PARAM_DEFINE_FLOAT(RAC_ACC_I, 0.00f);
 
 /**
- * Wheel steering rate integrator gain
- *
+ * Acceleration controller derivative gain
  *
  * @unit %/rad
- * @min 0.00
- * @max 30
+ * @min 0.0
+ * @max 30.0
  * @decimal 3
  * @increment 0.005
- * @group GND Attitude Control
+ * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(GND_WR_D, 0.00f);
+PARAM_DEFINE_FLOAT(RAC_ACC_D, 0.00f);
 
 /**
  * Wheel steering rate integrator limit
@@ -95,49 +125,20 @@ PARAM_DEFINE_FLOAT(GND_WR_D, 0.00f);
  * @max 1.0
  * @decimal 2
  * @increment 0.05
- * @group GND Attitude Control
+ * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(GND_WR_IMAX, 0.0f);
+PARAM_DEFINE_FLOAT(RAC_ACC_IMAX, 0.0f);
 
 /**
- * Maximum wheel steering rate
- *
- * This limits the maximum wheel steering rate the controller will output (in degrees per
- * second). Setting a value of zero disables the limit.
- *
- * @unit deg/s
- * @min 0.0
- * @max 90.0
- * @decimal 1
- * @increment 0.5
- * @group GND Attitude Control
- */
-PARAM_DEFINE_FLOAT(GND_W_RMAX, 90.0f);
-
-/**
- * Wheel steering rate feed forward
- *
- * Direct feed forward from rate setpoint to control surface output
- *
- * @unit %/rad/s
- * @min 0.0
- * @max 10.0
- * @decimal 2
- * @increment 0.05
- * @group GND Attitude Control
- */
-PARAM_DEFINE_FLOAT(GND_WR_FF, 0.0f);
-
-/**
- * Whether to scale throttle by battery power level
+ * Whether to scale control effort by battery power level
  *
  * This compensates for voltage drop of the battery over time by attempting to
- * normalize performance across the operating range of the battery. The fixed wing
+ * normalize performance across the operating range of the battery. The vehicle
  * should constantly behave as if it was fully charged with reduced max thrust
  * at lower battery percentages. i.e. if cruise speed is at 0.5 throttle at 100% battery,
  * it will still be 0.5 at 60% battery.
  *
  * @boolean
- * @group GND Attitude Control
+ * @group Rover Ackermann Control
  */
-PARAM_DEFINE_INT32(GND_BAT_SCALE_EN, 0);
+PARAM_DEFINE_INT32(RAC_BAT_SCALE_EN, 0);

@@ -122,8 +122,28 @@ bool FlightTaskAuto::_evaluateTriplets()
 	// Temporary target variable where we save the local reprojection of the latest navigator current triplet.
 	matrix::Vector3f tmp_target;
 
-	if (!PX4_ISFINITE(_sub_triplet_setpoint->get().current.lat)
-	    || !PX4_ISFINITE(_sub_triplet_setpoint->get().current.lon)) {
+	// Directly use local position if valid
+	if (_sub_triplet_setpoint->get().current.position_valid) {
+		if (!PX4_ISFINITE(_sub_triplet_setpoint->get().current.x) ||
+		    !PX4_ISFINITE(_sub_triplet_setpoint->get().current.y)) {
+			// No position provided in xy. Lock position
+			if (!PX4_ISFINITE(_lock_position_xy(0))) {
+				tmp_target(0) = _lock_position_xy(0) = _position(0);
+				tmp_target(1) = _lock_position_xy(1) = _position(1);
+
+			} else {
+				tmp_target(0) = _lock_position_xy(0);
+				tmp_target(1) = _lock_position_xy(1);
+				_lock_position_xy *= NAN;
+			}
+
+		} else {
+			tmp_target(0) = _sub_triplet_setpoint->get().current.x;
+			tmp_target(1) = _sub_triplet_setpoint->get().current.y;
+		}
+
+	} else if (!PX4_ISFINITE(_sub_triplet_setpoint->get().current.lat)
+		   || !PX4_ISFINITE(_sub_triplet_setpoint->get().current.lon)) {
 		// No position provided in xy. Lock position
 		if (!PX4_ISFINITE(_lock_position_xy(0))) {
 			tmp_target(0) = _lock_position_xy(0) = _position(0);
@@ -141,7 +161,13 @@ bool FlightTaskAuto::_evaluateTriplets()
 				       _sub_triplet_setpoint->get().current.lat, _sub_triplet_setpoint->get().current.lon, &tmp_target(0), &tmp_target(1));
 	}
 
-	tmp_target(2) = -(_sub_triplet_setpoint->get().current.alt - _reference_altitude);
+	// Directly use local altitude if valid
+	if (_sub_triplet_setpoint->get().current.position_valid) {
+		tmp_target(2) = _sub_triplet_setpoint->get().current.z;
+
+	} else {
+		tmp_target(2) = -(_sub_triplet_setpoint->get().current.alt - _reference_altitude);
+	}
 
 	// Check if anything has changed. We do that by comparing the temporary target
 	// to the internal _triplet_target.

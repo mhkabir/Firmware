@@ -45,6 +45,11 @@ if param compare SYS_MC_EST_GROUP 2
 then
 	ekf2 start
 fi
+
+#
+# Landing Target EKF
+#
+landing_target_ekf start
 ###############################################################################
 #                        End Estimator Group Selection                        #
 ###############################################################################

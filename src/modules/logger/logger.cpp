@@ -615,11 +615,11 @@ bool Logger::try_to_subscribe_topic(LoggerSubscription &sub, int multi_instance)
 void Logger::add_default_topics()
 {
 	// Note: try to avoid setting the interval where possible, as it increases RAM usage
-	add_topic("actuator_controls_0", 100);
+	add_topic("actuator_controls_0");
 	add_topic("actuator_controls_1", 100);
 	add_topic("actuator_outputs", 100);
 	add_topic("airspeed", 200);
-	add_topic("battery_status", 500);
+	add_topic("battery_status");
 	add_topic("camera_capture");
 	add_topic("camera_trigger");
 	add_topic("cpuload");
@@ -644,7 +644,7 @@ void Logger::add_default_topics()
 	add_topic("telemetry_status");
 	add_topic("vehicle_air_data", 200);
 	add_topic("vehicle_attitude", 30);
-	add_topic("vehicle_attitude_setpoint", 100);
+	add_topic("vehicle_ackermann_setpoint");
 	add_topic("vehicle_body_state");
 	add_topic("vehicle_command");
 	add_topic("vehicle_global_position", 200);

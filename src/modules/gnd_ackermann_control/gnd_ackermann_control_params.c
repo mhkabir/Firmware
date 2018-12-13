@@ -77,68 +77,26 @@ PARAM_DEFINE_FLOAT(RAC_STEER_MAX, 0.52f);
 PARAM_DEFINE_FLOAT(RAC_VEL_P, 1.0f);
 
 /**
- * Acceleration controller proportional gain
+ * Acceleration to torque transfer function
  *
- * This defines how much torque will be commanded depending on the
- * current acceleration error.
+ * This defines the factor mapping acceleration demand to normalized torque.
  *
  * @unit %/(m/s^2)
- * @min 0.005
- * @max 1.0
- * @decimal 3
- * @increment 0.005
- * @group Rover Ackermann Control
- */
-PARAM_DEFINE_FLOAT(RAC_ACC_P, 1.0f);
-
-/**
- * Acceleration controller integrator gain
- *
- * @unit %/rad
- * @min 0.0
- * @max 0.5
- * @decimal 3
- * @increment 0.005
- * @group Rover Ackermann Control
- */
-PARAM_DEFINE_FLOAT(RAC_ACC_I, 0.00f);
-
-/**
- * Acceleration controller derivative gain
- *
- * @unit %/rad
- * @min 0.0
- * @max 30.0
- * @decimal 3
- * @increment 0.005
- * @group Rover Ackermann Control
- */
-PARAM_DEFINE_FLOAT(RAC_ACC_D, 0.00f);
-
-/**
- * Wheel steering rate integrator limit
- *
- * The portion of the integrator part in the control surface deflection is
- * limited to this value
- *
  * @min 0.0
  * @max 1.0
- * @decimal 2
- * @increment 0.05
  * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(RAC_ACC_IMAX, 0.0f);
+PARAM_DEFINE_FLOAT(RAC_ACC_TQ, 0.25f);
 
 /**
- * Whether to scale control effort by battery power level
+ * Whether to scale control effort by battery voltage level
  *
  * This compensates for voltage drop of the battery over time by attempting to
  * normalize performance across the operating range of the battery. The vehicle
- * should constantly behave as if it was fully charged with reduced max thrust
- * at lower battery percentages. i.e. if cruise speed is at 0.5 throttle at 100% battery,
- * it will still be 0.5 at 60% battery.
+ * should constantly behave as if it was fully charged with reduced max torque
+ * at lower battery percentages.
  *
  * @boolean
  * @group Rover Ackermann Control
  */
-PARAM_DEFINE_INT32(RAC_BAT_SCALE_EN, 0);
+PARAM_DEFINE_INT32(RAC_BAT_SCALE, 1);

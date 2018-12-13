@@ -94,12 +94,9 @@ private:
 		float a_max;		/**< Vehicle acceleration limit */
 		float s_max;		/**< Vehicle steering limit */
 
-		float v_p;		/**< Proportional gain of the velocity controller */
+		float v_p;			/**< Proportional gain of the velocity controller */
 
-		float a_p;		/**< Proportional gain of the acceleration controller */
-		float a_i;		/**< Integral gain of the acceleration controller */
-		float a_d;		/**< Derivative of the acceleration controller */
-		float a_imax;		/**< maximum integrator level of the acceleration controller */
+		float a_t_tf;		/**< Factor mapping acceleration to torque */
 
 		int32_t bat_scale_en;			/**< Battery scaling enabled */
 
@@ -113,16 +110,12 @@ private:
 
 		param_t v_p;
 
-		param_t a_p;
-		param_t a_i;
-		param_t a_d;
-		param_t a_imax;
+		param_t a_t_tf;
 
 		param_t bat_scale_en;
 
 	} _parameter_handles{};		/**< handles for interesting parameters */
 
-	PID_t			_acceleration_ctrl{};
 	PID_t			_velocity_ctrl{};
 
 	void		parameters_update();

@@ -298,7 +298,7 @@ void VESC::cycle()
 		orb_copy(ORB_ID(actuator_controls_0), _control_sub, &_control);
 
 		// Yaw is normalized [-1, 1]
-		float yaw_target = _control.control[actuator_controls_s::INDEX_YAW];
+		float yaw_target = math::constrain(_control.control[actuator_controls_s::INDEX_YAW], -1.0f, 1.0f);
 		float steering_sp = _p_angle_trim.get();
 
 		if (yaw_target < 0.0f) {
@@ -313,7 +313,7 @@ void VESC::cycle()
 		send_steering_sp(steering_sp);
 
 		// Throttle is normalized [-1, 1]
-		float current_sp = _control.control[actuator_controls_s::INDEX_THROTTLE] * _p_max_current.get();
+		float current_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f, 1.0f) * _p_max_current.get();
 		send_current_sp(current_sp);
 
 		// Brake is normalized [0, 1]

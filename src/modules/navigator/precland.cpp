@@ -77,28 +77,17 @@ PrecLand::on_activation()
 	_search_cnt = 0;
 	_last_slewrate_time = 0;
 
-	//vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position(); TODO : why not use pointer everywhere?!
-
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	pos_sp_triplet->next.valid = false;
-
-	// Check that the current position setpoint is valid, otherwise land at current position
-	if (!pos_sp_triplet->current.valid) {
-		PX4_WARN("Resetting landing position to current position");
-		pos_sp_triplet->current.x = _navigator->get_local_position()->x;
-		pos_sp_triplet->current.y = _navigator->get_local_position()->y;
-		pos_sp_triplet->current.z = _navigator->get_local_position()->z;
-		pos_sp_triplet->current.position_valid = true;
-		pos_sp_triplet->current.valid = true;
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-	}
 
 	_sp_pev = matrix::Vector2f(0, 0);
 	_sp_pev_prev = matrix::Vector2f(0, 0);
 	_last_slewrate_time = 0;
 
 	switch_to_state_start();
+
+	PX4_INFO("Precision landing activated.");
 
 }
 
@@ -173,34 +162,27 @@ PrecLand::run_state_start()
 		}
 	}
 
-	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-	// TODO check
-	float dist = get_distance_to_point(pos_sp_triplet->current.x, pos_sp_triplet->current.y,
-					   _navigator->get_local_position()->x, _navigator->get_local_position()->y);
+	if (!_point_reached_time) {
+		_point_reached_time = hrt_absolute_time();
+	}
 
-	// check if we've reached the start point
-	if (dist < _navigator->get_acceptance_radius()) {
-		if (!_point_reached_time) {
-			_point_reached_time = hrt_absolute_time();
-		}
+	// if we don't see the target after 1 second, search for it
+	if (_param_search_timeout.get() > 0) {
 
-		// if we don't see the target after 1 second, search for it
-		if (_param_search_timeout.get() > 0) {
-
-			if (hrt_absolute_time() - _point_reached_time > 2000000) {
-				if (!switch_to_state_search()) {
-					if (!switch_to_state_fallback()) {
-						PX4_ERR("Can't switch to search or fallback landing");
-					}
+		if (hrt_absolute_time() - _point_reached_time > 2000000) {
+			if (!switch_to_state_search()) {
+				if (!switch_to_state_fallback()) {
+					PX4_ERR("Can't switch to search or fallback landing");
 				}
 			}
+		}
 
-		} else {
-			if (!switch_to_state_fallback()) {
-				PX4_ERR("Can't switch to search or fallback landing");
-			}
+	} else {
+		if (!switch_to_state_fallback()) {
+			PX4_ERR("Can't switch to search or fallback landing");
 		}
 	}
+
 }
 
 void
@@ -211,14 +193,6 @@ PrecLand::run_state_horizontal_approach()
 	// check if target visible, if not go to start
 	if (!check_state_conditions(PrecLandState::HorizontalApproach)) {
 		PX4_WARN("Lost landing target while landing (horizontal approach).");
-
-		// Stay at current position for searching for the landing target
-		pos_sp_triplet->current.x = _navigator->get_local_position()->x;
-		pos_sp_triplet->current.y = _navigator->get_local_position()->y;
-		pos_sp_triplet->current.z = _navigator->get_local_position()->z;
-		pos_sp_triplet->current.valid = true;
-		pos_sp_triplet->current.position_valid = true;
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 
 		if (!switch_to_state_start()) {
 			if (!switch_to_state_fallback()) {
@@ -260,9 +234,10 @@ PrecLand::run_state_horizontal_approach()
 
 	pos_sp_triplet->current.x = x;
 	pos_sp_triplet->current.y = y;
-	pos_sp_triplet->current.z = _approach_alt;
-	pos_sp_triplet->current.valid = true;
 	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.z = _approach_alt;
+	pos_sp_triplet->current.alt_valid = true;
+	pos_sp_triplet->current.valid = true;
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 
 	_navigator->set_position_setpoint_triplet_updated();
@@ -278,14 +253,6 @@ PrecLand::run_state_descend_above_target()
 		if (!switch_to_state_final_approach()) {
 			PX4_WARN("Lost landing target while landing (descending).");
 
-			// Stay at current position for searching for the target
-			pos_sp_triplet->current.x = _navigator->get_local_position()->x;
-			pos_sp_triplet->current.y = _navigator->get_local_position()->y;
-			pos_sp_triplet->current.z = _navigator->get_local_position()->z;
-			pos_sp_triplet->current.valid = true;
-			pos_sp_triplet->current.position_valid = true;
-			pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
-
 			if (!switch_to_state_start()) {
 				if (!switch_to_state_fallback()) {
 					PX4_ERR("Can't switch to fallback landing");
@@ -298,8 +265,9 @@ PrecLand::run_state_descend_above_target()
 
 	pos_sp_triplet->current.x = _target_pose.x_abs;
 	pos_sp_triplet->current.y = _target_pose.y_abs;
-	pos_sp_triplet->current.valid = true;
 	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.alt_valid = false;
+	pos_sp_triplet->current.valid = true;
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
 
 	_navigator->set_position_setpoint_triplet_updated();
@@ -358,7 +326,10 @@ PrecLand::switch_to_state_start()
 {
 	if (check_state_conditions(PrecLandState::Start)) {
 		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
+		pos_sp_triplet->current.position_valid = false;
+		pos_sp_triplet->current.alt_valid = false;
+		pos_sp_triplet->current.valid = true;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LOITER;
 		_navigator->set_position_setpoint_triplet_updated();
 		_search_cnt++;
 
@@ -420,9 +391,10 @@ PrecLand::switch_to_state_search()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 	pos_sp_triplet->current.x = _navigator->get_local_position()->x;
 	pos_sp_triplet->current.y = _navigator->get_local_position()->y;
-	pos_sp_triplet->current.z = -_param_search_alt.get();
-	pos_sp_triplet->current.valid = true;
 	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.z = -_param_search_alt.get();
+	pos_sp_triplet->current.alt_valid = true;
+	pos_sp_triplet->current.valid = true;
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 	_navigator->set_position_setpoint_triplet_updated();
 
@@ -437,12 +409,11 @@ bool
 PrecLand::switch_to_state_fallback()
 {
 	PX4_WARN("Falling back to normal land.");
+
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-	pos_sp_triplet->current.x = _navigator->get_local_position()->x;
-	pos_sp_triplet->current.y = _navigator->get_local_position()->y;
-	pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+	pos_sp_triplet->current.position_valid = false;
+	pos_sp_triplet->current.alt_valid = false;
 	pos_sp_triplet->current.valid = true;
-	pos_sp_triplet->current.position_valid = true;
 	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
 	_navigator->set_position_setpoint_triplet_updated();
 
@@ -580,9 +551,4 @@ void PrecLand::slewrate(float &sp_x, float &sp_y)
 
 	sp_x = sp_curr(0);
 	sp_y = sp_curr(1);
-}
-
-float PrecLand::get_distance_to_point(float &x1, float &y1, float &x2, float &y2)
-{
-	return sqrtf(powf(x1 - x2, 2) + powf(y1 - y2, 2));
 }

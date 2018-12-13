@@ -85,6 +85,7 @@ set(msg_files
 	position_setpoint.msg
 	position_setpoint_triplet.msg
 	power_button_state.msg
+	precland_state.msg
 	pwm_input.msg
 	qshell_req.msg
 	qshell_retval.msg

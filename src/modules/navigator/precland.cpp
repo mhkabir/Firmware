@@ -73,7 +73,7 @@ PrecLand::on_activation()
 		_target_pose_sub = orb_subscribe(ORB_ID(landing_target_pose));
 	}
 
-	_state = PrecLandState::Start;
+	_state = precland_state_s::START;
 	_search_cnt = 0;
 	_last_slewrate_time = 0;
 
@@ -106,37 +106,32 @@ PrecLand::on_active()
 		_target_pose_valid = false;
 	}
 
-	// stop if we are landed
-	if (_navigator->get_land_detected()->landed) {
-		switch_to_state_done();
-	}
-
 	switch (_state) {
-	case PrecLandState::Start:
+	case precland_state_s::START:
 		run_state_start();
 		break;
 
-	case PrecLandState::HorizontalApproach:
+	case precland_state_s::HORIZONTAL_APPROACH:
 		run_state_horizontal_approach();
 		break;
 
-	case PrecLandState::DescendAboveTarget:
+	case precland_state_s::DESCEND_ABOVE_TARGET:
 		run_state_descend_above_target();
 		break;
 
-	case PrecLandState::FinalApproach:
+	case precland_state_s::FINAL_APPROACH:
 		run_state_final_approach();
 		break;
 
-	case PrecLandState::Search:
+	case precland_state_s::SEARCH:
 		run_state_search();
 		break;
 
-	case PrecLandState::Fallback:
-		run_state_fallback();
+	case precland_state_s::FINISHED:
+		// nothing to do
 		break;
 
-	case PrecLandState::Done:
+	case precland_state_s::FAILED:
 		// nothing to do
 		break;
 
@@ -144,6 +139,15 @@ PrecLand::on_active()
 		// unknown state
 		break;
 	}
+
+	// Publish state
+	precland_state_s state {};
+
+	state.timestamp = hrt_absolute_time();
+	state.state = _state;
+
+	int instance;
+	orb_publish_auto(ORB_ID(precland_state), &_precland_state_pub, &state, &instance, ORB_PRIO_LOW);
 
 }
 
@@ -156,10 +160,8 @@ PrecLand::run_state_start()
 	}
 
 	if (_mode == PrecLandMode::Opportunistic) {
-		// could not see the target immediately, so just fall back to normal landing
-		if (!switch_to_state_fallback()) {
-			PX4_ERR("Can't switch to search or fallback landing");
-		}
+		// could not see the target immediately, so just fail landing
+		switch_to_state_failed();
 	}
 
 	if (!_point_reached_time) {
@@ -171,16 +173,13 @@ PrecLand::run_state_start()
 
 		if (hrt_absolute_time() - _point_reached_time > 2000000) {
 			if (!switch_to_state_search()) {
-				if (!switch_to_state_fallback()) {
-					PX4_ERR("Can't switch to search or fallback landing");
-				}
+				PX4_ERR("Can't switch to search");
+				switch_to_state_failed();
 			}
 		}
 
 	} else {
-		if (!switch_to_state_fallback()) {
-			PX4_ERR("Can't switch to search or fallback landing");
-		}
+		switch_to_state_failed();
 	}
 
 }
@@ -191,19 +190,18 @@ PrecLand::run_state_horizontal_approach()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	// check if target visible, if not go to start
-	if (!check_state_conditions(PrecLandState::HorizontalApproach)) {
+	if (!check_state_conditions(precland_state_s::HORIZONTAL_APPROACH)) {
 		PX4_WARN("Lost landing target while landing (horizontal approach).");
 
 		if (!switch_to_state_start()) {
-			if (!switch_to_state_fallback()) {
-				PX4_ERR("Can't switch to fallback landing");
-			}
+			PX4_ERR("Can't switch to start"); // TODO remove?
+			switch_to_state_failed();
 		}
 
 		return;
 	}
 
-	if (check_state_conditions(PrecLandState::DescendAboveTarget)) {
+	if (check_state_conditions(precland_state_s::DESCEND_ABOVE_TARGET)) {
 		if (!_point_reached_time) {
 			_point_reached_time = hrt_absolute_time();
 		}
@@ -217,14 +215,14 @@ PrecLand::run_state_horizontal_approach()
 
 	}
 
-	if (hrt_absolute_time() - _state_start_time > STATE_TIMEOUT) {
+	// Fail landing after 20 seconds.
+	if (hrt_absolute_time() - _state_start_time > 20000000) {
 		PX4_ERR("Precision landing took too long during horizontal approach phase.");
 
-		if (switch_to_state_fallback()) {
+		if (switch_to_state_failed()) {
 			return;
 		}
 
-		PX4_ERR("Can't switch to fallback landing");
 	}
 
 	float x = _target_pose.x_abs;
@@ -249,14 +247,13 @@ PrecLand::run_state_descend_above_target()
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 
 	// check if target visible
-	if (!check_state_conditions(PrecLandState::DescendAboveTarget)) {
+	if (!check_state_conditions(precland_state_s::DESCEND_ABOVE_TARGET)) {
 		if (!switch_to_state_final_approach()) {
 			PX4_WARN("Lost landing target while landing (descending).");
 
 			if (!switch_to_state_start()) {
-				if (!switch_to_state_fallback()) {
-					PX4_ERR("Can't switch to fallback landing");
-				}
+				PX4_ERR("Can't switch to start"); // TODO remove?
+				switch_to_state_failed();
 			}
 		}
 
@@ -276,21 +273,24 @@ PrecLand::run_state_descend_above_target()
 void
 PrecLand::run_state_final_approach()
 {
-	// nothing to do, will land
+	// Successful landing
+	if (_navigator->get_land_detected()->landed) {
+		switch_to_state_finished();
+	}
 }
 
 void
 PrecLand::run_state_search()
 {
 	// check if we can see the target
-	if (check_state_conditions(PrecLandState::HorizontalApproach)) {
+	if (check_state_conditions(precland_state_s::HORIZONTAL_APPROACH)) {
 		if (!_target_acquired_time) {
 			// Target just became visible, stop climbing
 			_target_acquired_time = hrt_absolute_time();
 			position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
 			pos_sp_triplet->current.z = _navigator->get_local_position()->z;
 			pos_sp_triplet->current.valid = true;
-			pos_sp_triplet->current.position_valid = true;
+			pos_sp_triplet->current.position_valid = true; // TODO : this is hack
 			pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 			_navigator->set_position_setpoint_triplet_updated();
 		}
@@ -309,33 +309,28 @@ PrecLand::run_state_search()
 	if (hrt_absolute_time() - _state_start_time > _param_search_timeout.get()*SEC2USEC) {
 		PX4_WARN("Search timed out");
 
-		if (!switch_to_state_fallback()) {
-			PX4_ERR("Can't switch to fallback landing");
-		}
+		switch_to_state_failed();
 	}
-}
-
-void
-PrecLand::run_state_fallback()
-{
-	// nothing to do, will land
 }
 
 bool
 PrecLand::switch_to_state_start()
 {
-	if (check_state_conditions(PrecLandState::Start)) {
+	if (check_state_conditions(precland_state_s::START)) {
 		position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-		pos_sp_triplet->current.position_valid = false;
-		pos_sp_triplet->current.alt_valid = false;
+		pos_sp_triplet->current.x = _navigator->get_local_position()->x;
+		pos_sp_triplet->current.y = _navigator->get_local_position()->y;
+		pos_sp_triplet->current.position_valid = true;
+		pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+		pos_sp_triplet->current.alt_valid = true;
 		pos_sp_triplet->current.valid = true;
-		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LOITER;
+		pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 		_navigator->set_position_setpoint_triplet_updated();
 		_search_cnt++;
 
 		_point_reached_time = 0;
 
-		_state = PrecLandState::Start;
+		_state = precland_state_s::START;
 		_state_start_time = hrt_absolute_time();
 		return true;
 	}
@@ -346,12 +341,12 @@ PrecLand::switch_to_state_start()
 bool
 PrecLand::switch_to_state_horizontal_approach()
 {
-	if (check_state_conditions(PrecLandState::HorizontalApproach)) {
+	if (check_state_conditions(precland_state_s::HORIZONTAL_APPROACH)) {
 		_approach_alt = _navigator->get_local_position()->z;
 
 		_point_reached_time = 0;
 
-		_state = PrecLandState::HorizontalApproach;
+		_state = precland_state_s::HORIZONTAL_APPROACH;
 		_state_start_time = hrt_absolute_time();
 		return true;
 	}
@@ -362,8 +357,8 @@ PrecLand::switch_to_state_horizontal_approach()
 bool
 PrecLand::switch_to_state_descend_above_target()
 {
-	if (check_state_conditions(PrecLandState::DescendAboveTarget)) {
-		_state = PrecLandState::DescendAboveTarget;
+	if (check_state_conditions(precland_state_s::DESCEND_ABOVE_TARGET)) {
+		_state = precland_state_s::DESCEND_ABOVE_TARGET;
 		_state_start_time = hrt_absolute_time();
 		return true;
 	}
@@ -374,8 +369,8 @@ PrecLand::switch_to_state_descend_above_target()
 bool
 PrecLand::switch_to_state_final_approach()
 {
-	if (check_state_conditions(PrecLandState::FinalApproach)) {
-		_state = PrecLandState::FinalApproach;
+	if (check_state_conditions(precland_state_s::FINAL_APPROACH)) {
+		_state = precland_state_s::FINAL_APPROACH;
 		_state_start_time = hrt_absolute_time();
 		return true;
 	}
@@ -400,48 +395,51 @@ PrecLand::switch_to_state_search()
 
 	_target_acquired_time = 0;
 
-	_state = PrecLandState::Search;
+	_state = precland_state_s::SEARCH;
 	_state_start_time = hrt_absolute_time();
 	return true;
 }
 
 bool
-PrecLand::switch_to_state_fallback()
+PrecLand::switch_to_state_failed()
 {
-	PX4_WARN("Falling back to normal land.");
+	PX4_ERR("Precision landing failed.");
 
 	position_setpoint_triplet_s *pos_sp_triplet = _navigator->get_position_setpoint_triplet();
-	pos_sp_triplet->current.position_valid = false;
-	pos_sp_triplet->current.alt_valid = false;
+	pos_sp_triplet->current.x = _navigator->get_local_position()->x;
+	pos_sp_triplet->current.y = _navigator->get_local_position()->y;
+	pos_sp_triplet->current.position_valid = true;
+	pos_sp_triplet->current.z = _navigator->get_local_position()->z;
+	pos_sp_triplet->current.alt_valid = true;
 	pos_sp_triplet->current.valid = true;
-	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_LAND;
+	pos_sp_triplet->current.type = position_setpoint_s::SETPOINT_TYPE_POSITION;
 	_navigator->set_position_setpoint_triplet_updated();
 
-	_state = PrecLandState::Fallback;
+	_state = precland_state_s::FAILED;
 	_state_start_time = hrt_absolute_time();
 	return true;
 }
 
 bool
-PrecLand::switch_to_state_done()
+PrecLand::switch_to_state_finished()
 {
-	_state = PrecLandState::Done;
+	_state = precland_state_s::FINISHED;
 	_state_start_time = hrt_absolute_time();
 	return true;
 }
 
-bool PrecLand::check_state_conditions(PrecLandState state)
+bool PrecLand::check_state_conditions(uint8_t state)
 {
 	vehicle_local_position_s *vehicle_local_position = _navigator->get_local_position();
 
 	switch (state) {
-	case PrecLandState::Start:
+	case precland_state_s::START:
 		return _search_cnt <= _param_max_searches.get();
 
-	case PrecLandState::HorizontalApproach:
+	case precland_state_s::HORIZONTAL_APPROACH:
 
 		// if we're already in this state, only want to make it invalid if we reached the target but can't see it anymore
-		if (_state == PrecLandState::HorizontalApproach) {
+		if (_state == precland_state_s::HORIZONTAL_APPROACH) {
 			if (fabsf(_target_pose.x_abs - vehicle_local_position->x) < _param_hacc_rad.get()
 			    && fabsf(_target_pose.y_abs - vehicle_local_position->y) < _param_hacc_rad.get()) {
 				// we've reached the position where we last saw the target. If we don't see it now, we need to do something
@@ -457,12 +455,12 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 		// If we're trying to switch to this state, the target needs to be visible
 		return _target_pose_updated && _target_pose_valid && _target_pose.abs_pos_valid;
 
-	case PrecLandState::DescendAboveTarget:
+	case precland_state_s::DESCEND_ABOVE_TARGET:
 
 		// if we're already in this state, only leave it if target becomes unusable, don't care about horizontall offset to target
-		if (_state == PrecLandState::DescendAboveTarget) {
+		if (_state == precland_state_s::DESCEND_ABOVE_TARGET) {
 			// if we're close to the ground, we're more critical of target timeouts so we quickly go into descend
-			if (check_state_conditions(PrecLandState::FinalApproach)) {
+			if (check_state_conditions(precland_state_s::FINAL_APPROACH)) {
 				return hrt_absolute_time() - _target_pose.timestamp < 500000; // 0.5s
 
 			} else {
@@ -476,14 +474,17 @@ bool PrecLand::check_state_conditions(PrecLandState state)
 			       && fabsf(_target_pose.y_abs - vehicle_local_position->y) < _param_hacc_rad.get();
 		}
 
-	case PrecLandState::FinalApproach:
+	case precland_state_s::FINAL_APPROACH:
 		return _target_pose_valid && _target_pose.abs_pos_valid
 		       && (_target_pose.z_abs - vehicle_local_position->z) < _param_final_approach_alt.get();
 
-	case PrecLandState::Search:
+	case precland_state_s::SEARCH:
 		return true;
 
-	case PrecLandState::Fallback:
+	case precland_state_s::FAILED:
+		return true;
+
+	case precland_state_s::FINISHED:
 		return true;
 
 	default:

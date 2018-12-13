@@ -44,10 +44,12 @@
 #include <lib/ecl/geo/geo.h>
 #include <px4_module_params.h>
 #include <uORB/topics/landing_target_pose.h>
+#include <uORB/topics/precland_state.h>
 
 #include "navigator_mode.h"
 #include "mission_block.h"
 
+/*
 enum class PrecLandState {
 	Start, // Starting state
 	HorizontalApproach, // Positioning over landing target while maintaining altitude
@@ -56,7 +58,7 @@ enum class PrecLandState {
 	Search, // Search for landing target
 	Fallback, // Fallback landing method
 	Done // Done landing
-};
+};*/
 
 enum class PrecLandMode {
 	Opportunistic = 1, // only do precision landing if landing target visible at the beginning
@@ -83,7 +85,6 @@ private:
 	void run_state_descend_above_target();
 	void run_state_final_approach();
 	void run_state_search();
-	void run_state_fallback();
 
 	// attempt to switch to a different state. Returns true if state change was successful, false otherwise
 	bool switch_to_state_start();
@@ -91,19 +92,20 @@ private:
 	bool switch_to_state_descend_above_target();
 	bool switch_to_state_final_approach();
 	bool switch_to_state_search();
-	bool switch_to_state_fallback();
-	bool switch_to_state_done();
+	bool switch_to_state_finished();
+	bool switch_to_state_failed();
 
 	// check if a given state could be changed into. Return true if possible to transition to state, false otherwise
-	bool check_state_conditions(PrecLandState state);
+	bool check_state_conditions(uint8_t state);
 	void slewrate(float &sp_x, float &sp_y);
-	float get_distance_to_point(float &x1, float &y1, float &x2, float &y2);
 
 	landing_target_pose_s _target_pose{}; /**< precision landing target position */
 
 	int _target_pose_sub{-1};
 	bool _target_pose_valid{false}; /**< whether we have received a landing target position message */
 	bool _target_pose_updated{false}; /**< wether the landing target position message is updated */
+
+	orb_advert_t _precland_state_pub{nullptr};
 
 	uint64_t _state_start_time{0}; /**< time when we entered current state */
 	uint64_t _last_slewrate_time{0}; /**< time when we last limited setpoint changes */
@@ -116,7 +118,7 @@ private:
 	matrix::Vector2f _sp_pev;
 	matrix::Vector2f _sp_pev_prev;
 
-	PrecLandState _state{PrecLandState::Start};
+	uint8_t _state{precland_state_s::START};
 
 	PrecLandMode _mode{PrecLandMode::Opportunistic};
 

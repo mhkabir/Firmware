@@ -59,13 +59,10 @@ GroundRoverAckermannControl::GroundRoverAckermannControl() :
 	_parameter_handles.v_p = param_find("RAC_VEL_P");
 
 	// Acceleration control
-	_parameter_handles.a_p = param_find("RAC_ACC_P");
-	_parameter_handles.a_i = param_find("RAC_ACC_I");
-	_parameter_handles.a_d = param_find("RAC_ACC_D");
-	_parameter_handles.a_imax = param_find("RAC_ACC_IMAX");
+	_parameter_handles.a_t_tf = param_find("RAC_ACC_TQ");
 
 	// Battery drop compensation
-	_parameter_handles.bat_scale_en = param_find("GND_BAT_SCALE_EN");
+	_parameter_handles.bat_scale_en = param_find("RAC_BAT_SCALE");
 
 	// Fetch initial parameter values
 	parameters_update();
@@ -110,20 +107,9 @@ GroundRoverAckermannControl::parameters_update()
 
 	param_get(_parameter_handles.v_p, &(_parameters.v_p));
 
-	param_get(_parameter_handles.a_p, &(_parameters.a_p));
-	param_get(_parameter_handles.a_i, &(_parameters.a_i));
-	param_get(_parameter_handles.a_d, &(_parameters.a_d));
-	param_get(_parameter_handles.a_imax, &(_parameters.a_imax));
+	param_get(_parameter_handles.a_t_tf, &(_parameters.a_t_tf));
 
 	param_get(_parameter_handles.bat_scale_en, &_parameters.bat_scale_en);
-
-	pid_init(&_acceleration_ctrl, PID_MODE_DERIVATIV_CALC, 0.01f);
-	pid_set_parameters(&_acceleration_ctrl,
-			   _parameters.a_p,
-			   _parameters.a_i,
-			   _parameters.a_d,
-			   _parameters.a_imax,
-			   1.0f);
 
 	pid_init(&_velocity_ctrl, PID_MODE_DERIVATIV_SET, 0.01f);
 	pid_set_parameters(&_velocity_ctrl,
@@ -254,34 +240,21 @@ GroundRoverAckermannControl::task_main()
 					acceleration_sp = pid_calculate(&_velocity_ctrl, _ackermann_sp.speed, state.vx, state.ax, delta_t);
 
 					// TODO : Limit acceleration demand
-					/*
-					if(PX4_ISFINITE(_ackermann_sp.acceleration)) {
-						 if(x < a) {
-					        return a;
-					    }
-					    else if(b < x) {
-					        return b;
-					    }
-					    else
-					        return x;
-					}*/
 				}
 
-				// Run acceleration controller to generate torque setpoint
-				float torque_sp = pid_calculate(&_acceleration_ctrl, acceleration_sp, state.ax, 0.0f, delta_t);
-				// TODO : add jerk limits
+				// Generate torque setpoint using transfer function
+				float torque_sp = acceleration_sp * _parameters.a_t_tf;
+
+				// Compensate control effort for battery voltage drop if enabled
+				if(_parameters.bat_scale_en && _battery_status.scale > 0.0f) {
+					torque_sp *= _battery_status.scale;
+				}
 
 				// Steering
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = _ackermann_sp.steering_angle; // TODO
 
 				// Torque
 				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = torque_sp;
-
-				// TODO : handle braking
-				// if moving forward, desired torque is backward, apply brakes
-				// if moving backwards, desired torque is forward, apply brakes
-				// Needs testing to see if setting negative current setpoint applies proportional brake,
-				// or a hard brake. If hard, then needs explicit brake torque setting via actuator_controls_s::INDEX_AIRBRAKES.
 
 			} else if (_ackermann_sp.manual_passthrough) {
 

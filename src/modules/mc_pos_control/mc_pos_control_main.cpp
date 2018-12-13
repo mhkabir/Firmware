@@ -804,7 +804,7 @@ MulticopterPositionControl::start_flight_task()
 		int error = _flight_tasks.switchTask(FlightTaskIndex::Offboard);
 
 		if (error != 0) {
-			PX4_WARN("Offboard activation failded with error: %s", _flight_tasks.errorToString(error));
+			PX4_WARN("Offboard activation failed with error: %s", _flight_tasks.errorToString(error));
 			task_failure = true;
 			_task_failure_count++;
 
@@ -820,6 +820,20 @@ MulticopterPositionControl::start_flight_task()
 
 		if (error != 0) {
 			PX4_WARN("Follow-Me activation failed with error: %s", _flight_tasks.errorToString(error));
+			task_failure = true;
+			_task_failure_count++;
+
+		} else {
+			// we want to be in this mode, reset the failure count
+			_task_failure_count = 0;
+		}
+
+	// Auto-precland
+	} else if (_vehicle_status.nav_state == vehicle_status_s::NAVIGATION_STATE_AUTO_PRECLAND) {
+		int error = _flight_tasks.switchTask(FlightTaskIndex::Precland);
+
+		if (error != 0) {
+			PX4_WARN("Precland activation failed with error: %s", _flight_tasks.errorToString(error));
 			task_failure = true;
 			_task_failure_count++;
 

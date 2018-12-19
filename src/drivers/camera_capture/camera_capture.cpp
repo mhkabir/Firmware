@@ -60,8 +60,8 @@ CameraCapture::CameraCapture() :
 	_last_exposure_time{},
 	_time_offset(0.0) // in seconds
 {
-	_capture_edge[0] = 1; // rising
-	_capture_edge[1] = 2; // both
+	_capture_edge[0] = input_capture_edge::Rising;
+	_capture_edge[1] = input_capture_edge::Both;
 
 	memset(&_work, 0, sizeof(_work));
 
@@ -82,25 +82,27 @@ CameraCapture::capture_callback(uint32_t chan_index,
 
 	uint64_t capture_timestamp = 0;
 
-	if (edge_state == 0) {											// Falling edge
+	if (edge_state == 0) {					// Falling edge
 
-		if (_capture_edge[cam_id] == 2) {
+		// TODO : currently only works with active_low pulses
+		if (_capture_edge[cam_id] == input_capture_edge::Both) {
 			_last_fall_time[cam_id] = edge_time;
 
-		} else if (_capture_edge[cam_id] == 0) {
+		} else if (_capture_edge[cam_id] == input_capture_edge::Falling) {
 			capture_timestamp = edge_time;
 		}
 
 	} else if (edge_state == 1) {			// Rising edge
 
-		if (_capture_edge[cam_id] == 2 && (_last_fall_time[cam_id] > 0)) { 	// Got falling edge before
+		if (_capture_edge[cam_id] == input_capture_edge::Both &&
+		    (_last_fall_time[cam_id] > 0)) { 	// Got falling edge before
 			// Calculate exposure time
 			_last_exposure_time[cam_id] = edge_time - _last_fall_time[cam_id];
 
 			// Calculated exposure time compensated timestamp
 			capture_timestamp = edge_time - (_last_exposure_time[cam_id] / 2);
 
-		} else if (_capture_edge[cam_id] == 1) {
+		} else if (_capture_edge[cam_id] == input_capture_edge::Rising) {
 			capture_timestamp = edge_time;
 		}
 	}
@@ -200,7 +202,7 @@ CameraCapture::set_capture_control(uint8_t cam_id, bool enable, bool reset_seq)
 	if (enable && !_capture_enabled[cam_id]) {
 		// Enable signal capture
 		reset_statistics(cam_id, reset_seq);
-		up_input_capture_set(pin, (input_capture_edge)(_capture_edge[cam_id] + 1), 0, &CameraCapture::capture_trampoline, this);
+		up_input_capture_set(pin, input_capture_edge(_capture_edge[cam_id]), 0, &CameraCapture::capture_trampoline, this);
 
 		_capture_enabled[cam_id] = true;
 
@@ -249,8 +251,9 @@ CameraCapture::status()
 {
 	for (uint8_t cam_id = 0; cam_id < NUM_CAMERAS; cam_id++) {
 		PX4_INFO("Camera %u status :", cam_id);
-		PX4_INFO("  Capturing %s edge", _capture_edge[cam_id] > 1 ? "both" : (_capture_edge[cam_id] == 0 ? "falling" :
-				"rising"));
+		PX4_INFO("  Capturing %s edges", _capture_edge[cam_id] == input_capture_edge::Both ? "both" :
+			 (_capture_edge[cam_id] == input_capture_edge::Falling ? "falling" :
+			  "rising"));
 		PX4_INFO("  Capture enabled : %s", _capture_enabled[cam_id] ? "YES" : "NO");
 		PX4_INFO("  Number of overflows : %u", _capture_overflows[cam_id]);
 		PX4_INFO("  Frame sequence : %u", _capture_seq[cam_id]);

@@ -1143,6 +1143,7 @@ void Ekf2::run()
 			}
 		}
 
+		/*
 		if (_range_finder_sub_index >= 0) {
 			bool range_finder_updated = false;
 
@@ -1176,7 +1177,10 @@ void Ekf2::run()
 
 		} else {
 			_range_finder_sub_index = getRangeSubIndex(_range_finder_subs);
-		}
+		}*/
+		// Save sensor limits reported by the rangefinder
+		_ekf.set_rangefinder_limits(0.0f, 1.0f);
+		_ekf.setRangeData(hrt_absolute_time(), 0.28f);
 
 		// get external vision data
 		// if error estimates are unavailable, use parameter defined defaults

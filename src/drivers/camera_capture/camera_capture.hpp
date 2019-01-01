@@ -98,6 +98,7 @@ public:
 	void 			set_capture_control(uint8_t cam_id, bool enable, bool reset_seq);
 
 	static struct work_s	_work;
+	static struct work_s	_publish_work;
 
 private:
 
@@ -116,6 +117,8 @@ private:
 	uint64_t		_last_fall_time[NUM_CAMERAS];
 	uint64_t		_last_exposure_time[NUM_CAMERAS];
 
+	camera_trigger_s _event;
+
 	// Signal capture callback
 	void			capture_callback(uint32_t chan_index,
 			hrt_abstime edge_time, uint32_t edge_state, uint32_t overflow);
@@ -123,7 +126,10 @@ private:
 	// Low-rate command handling loop
 	static void		cycle_trampoline(void *arg);
 
+	static void		publish_event(void *arg);
+
 	void			reset_statistics(uint8_t cam_id, bool reset_seq);
 
 };
 struct work_s CameraCapture::_work;
+struct work_s CameraCapture::_publish_work;

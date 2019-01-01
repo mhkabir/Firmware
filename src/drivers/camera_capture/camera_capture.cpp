@@ -57,9 +57,10 @@ CameraCapture::CameraCapture() :
 	_capture_overflows{},
 	_capture_seq{},
 	_last_fall_time{},
-	_last_exposure_time{}
+	_last_exposure_time{},
+	_event{}
 {
-	_capture_edge[0] = input_capture_edge::Rising;
+	_capture_edge[0] = input_capture_edge::Falling;
 	_capture_edge[1] = input_capture_edge::Both;
 
 	memset(&_work, 0, sizeof(_work));
@@ -106,19 +107,23 @@ CameraCapture::capture_callback(uint32_t chan_index,
 		}
 	}
 
-	if (capture_timestamp > 0) {
-		// TODO : don't do this from ISR
-		struct camera_trigger_s	trigger {};
-
-		trigger.timestamp = capture_timestamp;
-		trigger.camera_id = cam_id;
-		trigger.seq = _capture_seq[cam_id]++;
-
-		orb_publish(ORB_ID(camera_trigger), _trigger_pub, &trigger);
-	}
-
 	_capture_overflows[cam_id] = overflow;
 
+	if (capture_timestamp > 0) {
+		_event.timestamp = capture_timestamp;
+		_event.camera_id = cam_id;
+		_event.seq = _capture_seq[cam_id]++;
+		work_queue(HPWORK, &_publish_work, (worker_t)&CameraCapture::publish_event, camera_capture::g_camera_capture,
+		   USEC2TICK(1));
+
+	}
+
+}
+
+void CameraCapture::publish_event(void *arg)
+{
+	CameraCapture *cap = reinterpret_cast<CameraCapture *>(arg);
+	orb_publish(ORB_ID(camera_trigger), cap-> _trigger_pub, &cap->_event);
 }
 
 void
@@ -293,6 +298,7 @@ int camera_capture_main(int argc, char *argv[])
 		}
 
 		camera_capture::g_camera_capture->start();
+		//camera_capture::g_camera_capture->set_capture_control(0, true, true);
 		return 0;
 	}
 

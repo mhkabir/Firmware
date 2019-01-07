@@ -66,7 +66,7 @@ CameraCapture::CameraCapture() :
 	memset(&_work, 0, sizeof(_work));
 
 	struct camera_trigger_s trigger = {};
-	_trigger_pub = orb_advertise_queue(ORB_ID(camera_trigger), &trigger, 3);
+	_trigger_pub = orb_advertise(ORB_ID(camera_trigger), &trigger);
 }
 
 CameraCapture::~CameraCapture()

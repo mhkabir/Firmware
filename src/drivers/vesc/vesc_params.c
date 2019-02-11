@@ -39,6 +39,24 @@
  */
 
 /**
+ * VESC control mode
+ *
+ * @group VESC
+ * @value 0 Current control
+ * @value 1 ERPM control
+ */
+PARAM_DEFINE_INT32(VESC_CTL_MODE, 0);
+
+/**
+ * Maximum ERPM to command to the motor
+ *
+ * @group VESC
+ * @min 0
+ * @max 30000
+ */
+PARAM_DEFINE_INT32(VESC_MAX_ERPM, 10000);
+
+/**
  * Maximum current to deliver to the motor
  *
  * @group VESC

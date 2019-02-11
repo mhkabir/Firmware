@@ -110,6 +110,7 @@ private:
 	px4_pollfd_struct_t	_poll_fd;
 
 	void subscribe();
+	void send_erpm_sp(int32_t erpm);
 	void send_current_sp(float current);
 	void send_brake_current_sp(float current);
 	void send_steering_sp(float angle);
@@ -118,6 +119,8 @@ private:
 
 	/** @note Declare local parameters using defined parameters. */
 	DEFINE_PARAMETERS(
+		(ParamInt<px4::params::VESC_CTL_MODE>)  _p_control_mode,
+		(ParamInt<px4::params::VESC_MAX_ERPM>)  _p_max_erpm,
 		(ParamFloat<px4::params::VESC_MAX_CURRENT>)  _p_max_current,
 		(ParamFloat<px4::params::VESC_BRK_CURRENT>)  _p_max_braking_current,
 		(ParamFloat<px4::params::VESC_ANGLE_TRIM>)  _p_angle_trim,
@@ -233,6 +236,23 @@ int VESC::init()
 	return ret;
 }
 
+void VESC::send_erpm_sp(int32_t erpm)
+{
+	// Create packet payload
+	int32_t index = 0;
+	uint8_t payload[5];
+
+	payload[index++] = COMM_SET_RPM;
+	vesc_common::buffer_append_int32(payload, erpm, &index);
+
+	// Send packet
+	int ret = vesc_common::send_payload(_uart_fd, payload, 5);
+
+	if (ret < 1) {
+		PX4_ERR("TX ERROR: ret: %d, errno: %d", ret, errno);
+	}
+}
+
 void VESC::send_current_sp(float current)
 {
 	// Create packet payload
@@ -312,14 +332,29 @@ void VESC::cycle()
 
 		send_steering_sp(steering_sp);
 
-		// Throttle is normalized [-1, 1]
-		float current_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f, 1.0f) * _p_max_current.get();
-		send_current_sp(current_sp);
+		if (_p_control_mode.get() == 0) { // Current control mode
+			// Throttle is normalized [-1, 1]
+			float current_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f,
+							   1.0f) * _p_max_current.get();
+			send_current_sp(current_sp);
 
-		// Brake is normalized [0, 1]
-		if(_control.control[actuator_controls_s::INDEX_AIRBRAKES] > 0.0f) {
-			float braking_current_sp = -_control.control[actuator_controls_s::INDEX_AIRBRAKES] * _p_max_braking_current.get();
-			send_brake_current_sp(braking_current_sp);
+			// Brake is normalized [0, 1]
+			if (_control.control[actuator_controls_s::INDEX_AIRBRAKES] > 0.0f) {
+				float braking_current_sp = -_control.control[actuator_controls_s::INDEX_AIRBRAKES] * _p_max_braking_current.get();
+				send_brake_current_sp(braking_current_sp);
+			}
+
+		} else if (_p_control_mode.get() == 1) { // ERPM control mode
+			// Throttle is normalized [-1, 1]
+			int32_t erpm_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f,
+							  1.0f) * _p_max_erpm.get();
+
+			// Brake is normalized [0, 1]
+			if (_control.control[actuator_controls_s::INDEX_AIRBRAKES] > 0.0f) {
+				erpm_sp = 0;
+			}
+
+			send_erpm_sp(erpm_sp);
 		}
 	}
 

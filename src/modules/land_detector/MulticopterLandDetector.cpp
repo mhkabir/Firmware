@@ -189,7 +189,8 @@ bool MulticopterLandDetector::_get_ground_contact_state()
 	// we then can assume that the vehicle hit ground
 	bool in_descend = _is_climb_rate_enabled()
 			  && (_vehicleLocalPositionSetpoint.vz >= land_speed_threshold);
-	bool hit_ground = in_descend && !verticalMovement;
+	bool hit_ground = (_vehicleLocalPosition.dist_bottom_valid && (_vehicleLocalPosition.dist_bottom < 0.2f))
+			  || (in_descend && !verticalMovement);
 
 	// TODO: we need an accelerometer based check for vertical movement for flying without GPS
 	if ((_has_low_thrust() || hit_ground) && (!horizontalMovement || !_has_position_lock())

@@ -122,8 +122,8 @@ private:
 	struct gyro_calibration_s	_gyro_scale {};
 
 	// gyro 0.025 °/sec/LSB
-	float				_gyro_range_scale{0.025f};
-	float				_gyro_range_rad_s{math::radians(500.0f)};
+	float				_gyro_range_scale{0.1f};
+	float				_gyro_range_rad_s{math::radians(2000.0f)};
 
 	struct accel_calibration_s	_accel_scale {};
 

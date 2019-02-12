@@ -61,7 +61,7 @@ start(enum Rotation rotation)
 	if (g_dev != nullptr)
 		/* if already started, the still command succeeded */
 	{
-		errx(0, "already started");
+		PX4_ERR("already started");
 	}
 
 	/* create the driver */
@@ -89,7 +89,7 @@ fail:
 		g_dev = nullptr;
 	}
 
-	errx(1, "driver start failed");
+	PX4_ERR("driver start failed");
 }
 
 /**
@@ -109,14 +109,14 @@ test()
 	int fd = px4_open(ADIS16497_DEVICE_PATH_ACCEL, O_RDONLY);
 
 	if (fd < 0) {
-		err(1, "%s open failed", ADIS16497_DEVICE_PATH_ACCEL);
+		PX4_ERR("%s open failed", ADIS16497_DEVICE_PATH_ACCEL);
 	}
 
 	/* get the gyro driver */
 	int fd_gyro = px4_open(ADIS16497_DEVICE_PATH_GYRO, O_RDONLY);
 
 	if (fd_gyro < 0) {
-		err(1, "%s open failed", ADIS16497_DEVICE_PATH_GYRO);
+		PX4_ERR("%s open failed", ADIS16497_DEVICE_PATH_GYRO);
 	}
 
 	/* do a simple demand read */
@@ -124,7 +124,7 @@ test()
 
 	if (sz != sizeof(a_report)) {
 		PX4_ERR("ret: %d, expected: %d", sz, sizeof(a_report));
-		err(1, "immediate acc read failed");
+		PX4_ERR("immediate acc read failed");
 	}
 
 	print_message(a_report);
@@ -133,8 +133,8 @@ test()
 	sz = px4_read(fd_gyro, &g_report, sizeof(g_report));
 
 	if (sz != sizeof(g_report)) {
-		warnx("ret: %d, expected: %d", sz, sizeof(g_report));
-		err(1, "immediate gyro read failed");
+		PX4_ERR("ret: %d, expected: %d", sz, sizeof(g_report));
+		PX4_ERR("immediate gyro read failed");
 	}
 
 	print_message(g_report);
@@ -143,7 +143,7 @@ test()
 	px4_close(fd);
 
 	reset();
-	errx(0, "PASS");
+	PX4_INFO("PASS");
 }
 
 /**
@@ -155,11 +155,11 @@ reset()
 	int fd = px4_open(ADIS16497_DEVICE_PATH_ACCEL, O_RDONLY);
 
 	if (fd < 0) {
-		err(1, "open failed");
+		PX4_ERR("open failed");
 	}
 
 	if (px4_ioctl(fd, SENSORIOCRESET, 0) < 0) {
-		err(1, "driver reset failed");
+		PX4_ERR("driver reset failed");
 	}
 
 	px4_close(fd);
@@ -174,7 +174,7 @@ void
 info()
 {
 	if (g_dev == nullptr) {
-		errx(1, "driver not running");
+		PX4_ERR("driver not running");
 	}
 
 	printf("state @ %p\n", g_dev);

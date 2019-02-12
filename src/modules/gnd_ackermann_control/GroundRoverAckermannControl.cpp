@@ -231,6 +231,7 @@ GroundRoverAckermannControl::task_main()
 			    PX4_ISFINITE(_ackermann_sp.acceleration) &&
 			    PX4_ISFINITE(state.ax)) {
 
+				/*
 				float acceleration_sp = _ackermann_sp.acceleration;
 
 				// If needed, run velocity controller first to generate acceleration setpoint
@@ -244,6 +245,9 @@ GroundRoverAckermannControl::task_main()
 
 				// Generate torque setpoint using transfer function
 				float torque_sp = acceleration_sp * _parameters.a_t_tf;
+				*/
+
+				float torque_sp = _ackermann_sp.acceleration; // TODO : hack
 
 				// Compensate control effort for battery voltage drop if enabled
 				if (_parameters.bat_scale_en && _battery_status.scale > 0.0f) {

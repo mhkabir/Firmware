@@ -3,17 +3,14 @@
 # PX4 FMUv5 specific board sensors init
 #------------------------------------------------------------------------------
 
+# External SPI bus ADIS16497
+adis16497 -R 12 start
+
 # Internal SPI bus ICM-20602
 mpu6000 -R 8 -s -T 20602 start
 
 # Internal SPI bus ICM-20689
 mpu6000 -R 8 -z -T 20689 start
-
-# Internal SPI bus BMI055 accel
-bmi055 -A -R 10 start
-
-# Internal SPI bus BMI055 gyro
-bmi055 -G -R 10 start
 
 # Possible external compasses
 ist8310 -C -b 1 start
@@ -23,6 +20,3 @@ qmc5883 -X start
 
 # Possible internal compass
 ist8310 -C -b 5 start
-
-# Possible pmw3901 optical flow sensor
-pmw3901 start

@@ -625,11 +625,12 @@ void Logger::add_default_topics()
 	add_topic("mission");
 	add_topic("mission_result");
 	add_topic("optical_flow", 50);
-	add_topic("position_setpoint_triplet", 200);
+	//add_topic("position_setpoint_triplet", 200);
 	add_topic("precland_state");
 	add_topic("radio_status");
 	add_topic("rate_ctrl_status", 30);
 	add_topic("sensor_combined", 100);
+	add_topic("sensor_bias", 100);
 	add_topic("sensor_preflight", 200);
 	add_topic("system_power", 500);
 	add_topic("tecs_status", 200);
@@ -650,7 +651,6 @@ void Logger::add_default_topics()
 	add_topic("vehicle_vision_attitude");
 	add_topic("vehicle_vision_position");
 	add_topic("vtol_vehicle_status", 200);
-	add_topic("wind_estimate", 200);
 
 #ifdef CONFIG_ARCH_BOARD_SITL
 	add_topic("actuator_armed");

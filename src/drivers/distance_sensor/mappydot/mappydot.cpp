@@ -275,20 +275,18 @@ Mappydot::~Mappydot()
 int
 Mappydot::init()
 {
-	int ret = PX4_ERROR;
-
 	/* do I2C init (and probe) first */
 	set_device_address(MAPPYDOT_BASEADDR);
 
 	if (I2C::init() != OK) {
-		return ret;
+		return PX4_ERROR;
 	}
 
 	/* allocate basic report buffers */
 	_reports = new ringbuffer::RingBuffer(2, sizeof(obstacle_distance_s));
 
 	if (_reports == nullptr) {
-		return ret;
+		return PX4_ERROR;
 	}
 
 	_class_instance = register_class_devname(RANGE_FINDER_BASE_DEVICE_PATH); // TODO
@@ -306,29 +304,28 @@ Mappydot::init()
 	// XXX we should find out why we need to wait 200 ms here
 	//usleep(200000);
 
+	uint8_t sensor_address = MAPPYDOT_BASEADDR;
+	size_t sensor_count = 0;
+
 	// Check for connected rangefinders on each i2c port,
 	// starting from the base address 0x08 and counting upwards
-	for (size_t i = 0; i <= RANGE_FINDER_MAX_SENSORS; i++) {
-		uint8_t sensor_address = MAPPYDOT_BASEADDR + i;
+	for (size_t i = 0; i < RANGE_FINDER_MAX_SENSORS; i++) {
 		set_device_address(sensor_address);
 
 		if (probe() == 0) { /* sensor is present, store I2C address*/
-			PX4_INFO("Add sensor");
 			_sensor_addresses[i] = sensor_address;
+			sensor_count++;
+			PX4_INFO("sensor %d at address %d added", i, _sensor_addresses[i]);
 		}
+
+		sensor_address++;;
 	}
 
-	// TODO : loop
-	//PX4_INFO("Mappydot %d with address %d added", (counter + 1), _sensor_addresses[counter]);
-
-	// PX4_INFO("Total Mappydots connected: %lu", _sensor_addresses.size());
+	PX4_INFO("%d sensors connected", sensor_count);
 
 	// Set address back to base address
 	set_device_address(MAPPYDOT_BASEADDR);
-
-	ret = OK;
-
-	return ret;
+	return PX4_OK;
 }
 
 int

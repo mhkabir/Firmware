@@ -156,7 +156,7 @@
 #define MAPPYDOT_MIN_DISTANCE 	(0.20f)
 #define MAPPYDOT_MAX_DISTANCE 	(4.00f)
 
-#define MAPPYDOT_CONVERSION_INTERVAL 	100000 /* 10ms */
+#define MAPPYDOT_CONVERSION_INTERVAL 	10000 /* 10ms */
 
 #ifndef CONFIG_SCHED_WORKQUEUE
 # error This requires CONFIG_SCHED_WORKQUEUE.
@@ -303,9 +303,6 @@ Mappydot::init()
 	if (_obstacle_distance_topic == nullptr) {
 		PX4_ERR("failed to create obstacle_distance object");
 	}
-
-	// XXX we should find out why we need to wait 200 ms here
-	//usleep(200000);
 
 	// Check for connected rangefinders on each i2c port,
 	// starting from the base address 0x08 and counting upwards
@@ -481,7 +478,7 @@ Mappydot::read(device::file_t *filp, char *buffer, size_t buflen)
 		}
 
 		/* wait for it to complete */
-		usleep(MAPPYDOT_CONVERSION_INTERVAL * 2);
+		usleep(MAPPYDOT_CONVERSION_INTERVAL);
 
 		/* run the collection phase */
 		if (OK != collect()) {

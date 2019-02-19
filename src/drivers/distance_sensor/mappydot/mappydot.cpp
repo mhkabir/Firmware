@@ -38,35 +38,34 @@
  * Driver for the Mappydot infrared rangefinders connected via I2C.
  */
 
+#include <fcntl.h>
+#include <math.h>
+#include <poll.h>
+#include <semaphore.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <board_config.h>
+#include <containers/Array.hpp>
+#include <drivers/device/i2c.h>
+#include <drivers/device/ringbuffer.h>
+#include <drivers/drv_hrt.h>
+#include <drivers/drv_range_finder.h>
+
+#include <perf/perf_counter.h>
+
 #include <px4_config.h>
 #include <px4_getopt.h>
 #include <px4_workqueue.h>
 
-#include <drivers/device/i2c.h>
-
-#include <sys/types.h>
-#include <stdint.h>
-#include <stdlib.h>
-#include <stdbool.h>
-#include <semaphore.h>
-#include <string.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <stdio.h>
-#include <math.h>
-#include <unistd.h>
-#include <vector>
-
-#include <perf/perf_counter.h>
-
-#include <drivers/drv_hrt.h>
-#include <drivers/drv_range_finder.h>
-#include <drivers/device/ringbuffer.h>
-
 #include <uORB/uORB.h>
 #include <uORB/topics/obstacle_distance.h>
 
-#include <board_config.h>
 
 /* Configuration Constants */
 #define MAPPYDOT_BUS_DEFAULT		PX4_I2C_BUS_EXPANSION
@@ -194,7 +193,7 @@ private:
 	perf_counter_t		_sample_perf;
 	perf_counter_t		_comms_errors;
 
-	std::vector<uint8_t>	_sensor_addresses;
+	px4::Array<uint8_t, RANGE_FINDER_MAX_SENSORS> _sensor_addresses {};
 
 	/**
 	* Test whether the device supported by the driver is present at a
@@ -309,20 +308,20 @@ Mappydot::init()
 
 	// Check for connected rangefinders on each i2c port,
 	// starting from the base address 0x08 and counting upwards
-	for (unsigned counter = 0; counter <= MAPPYDOT_MAX_RANGEFINDERS; counter++) {
-		uint8_t sensor_address = MAPPYDOT_BASEADDR + counter;
+	for (size_t i = 0; i <= RANGE_FINDER_MAX_SENSORS; i++) {
+		uint8_t sensor_address = MAPPYDOT_BASEADDR + i;
 		set_device_address(sensor_address);
 
 		if (probe() == 0) { /* sensor is present, store I2C address*/
 			PX4_INFO("Add sensor");
-			_sensor_addresses.push_back(sensor_address);
+			_sensor_addresses[i] = sensor_address;
 		}
 	}
 
 	// TODO : loop
 	//PX4_INFO("Mappydot %d with address %d added", (counter + 1), _sensor_addresses[counter]);
 
-	PX4_INFO("Total Mappydots connected: %lu", _sensor_addresses.size());
+	// PX4_INFO("Total Mappydots connected: %lu", _sensor_addresses.size());
 
 	// Set address back to base address
 	set_device_address(MAPPYDOT_BASEADDR);
@@ -346,21 +345,11 @@ Mappydot::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 	case SENSORIOCSPOLLRATE: {
 			switch (arg) {
 
-			/* switching to manual polling */
-			case SENSOR_POLLRATE_MANUAL:
-				stop();
-				_measure_ticks = 0;
-				return OK;
-
-			/* external signalling (DRDY) not supported */
-			case SENSOR_POLLRATE_EXTERNAL:
-
 			/* zero would be bad */
 			case 0:
 				return -EINVAL;
 
 			/* set default/max polling rate */
-			case SENSOR_POLLRATE_MAX:
 			case SENSOR_POLLRATE_DEFAULT: {
 					/* do we need to start internal polling? */
 					bool want_start = (_measure_ticks == 0);
@@ -401,31 +390,6 @@ Mappydot::ioctl(device::file_t *filp, int cmd, unsigned long arg)
 					return OK;
 				}
 			}
-		}
-
-	case SENSORIOCGPOLLRATE:
-		if (_measure_ticks == 0) {
-			return SENSOR_POLLRATE_MANUAL;
-		}
-
-		return (1000 / _measure_ticks);
-
-	case SENSORIOCSQUEUEDEPTH: {
-			/* lower bound is mandatory, upper bound is a sanity check */
-			if ((arg < 1) || (arg > 100)) {
-				return -EINVAL;
-			}
-
-			ATOMIC_ENTER;
-
-			if (!_reports->resize(arg)) {
-				ATOMIC_LEAVE;
-				return -ENOMEM;
-			}
-
-			ATOMIC_LEAVE;
-
-			return OK;
 		}
 
 	case SENSORIOCRESET:

@@ -633,6 +633,7 @@ void Logger::add_default_topics()
 	add_topic("manual_control_setpoint", 200);
 	//add_topic("mission");
 	//add_topic("mission_result");
+	add_topic("timesync_status");
 	add_topic("optical_flow", 50);
 	add_topic("position_setpoint_triplet", 200);
 	//add_topic("radio_status");

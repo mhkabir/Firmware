@@ -522,7 +522,8 @@ ADIS16497::measure()
 	// ADIS16497 burst report should be 320 bits
 	static_assert(sizeof(adis_report) == (320 / 8), "ADIS16497 report not 320 bits");
 
-	const hrt_abstime t = hrt_absolute_time();
+	// Compensate timestamp for sensor internal delay + SPI transfer time
+	const hrt_abstime t = hrt_absolute_time() - 3019ULL;
 
 	if (OK != transferhword((uint16_t *)&adis_report, ((uint16_t *)&adis_report), sizeof(adis_report) / sizeof(uint16_t))) {
 		perf_count(_bad_transfers);

@@ -318,7 +318,7 @@ void VESC::cycle()
 		orb_copy(ORB_ID(actuator_controls_0), _control_sub, &_control);
 
 		// Yaw is normalized [-1, 1]
-		float yaw_target = math::constrain(_control.control[actuator_controls_s::INDEX_YAW], -1.0f, 1.0f);
+		float yaw_target = -math::constrain(_control.control[actuator_controls_s::INDEX_YAW], -1.0f, 1.0f);
 		float steering_sp = _p_angle_trim.get();
 
 		if (yaw_target < 0.0f) {

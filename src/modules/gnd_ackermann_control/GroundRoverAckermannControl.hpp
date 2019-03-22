@@ -39,6 +39,7 @@
 #include <px4_defines.h>
 #include <px4_tasks.h>
 #include <px4_posix.h>
+#include <px4_module_params.h>
 
 #include <drivers/drv_hrt.h>
 #include <mathlib/mathlib.h>
@@ -52,12 +53,13 @@
 #include <uORB/topics/vehicle_ackermann_setpoint.h>
 #include <uORB/topics/vehicle_body_state.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/debug_vect.h>
 #include <uORB/uORB.h>
 
 using matrix::Eulerf;
 using matrix::Quatf;
 
-class GroundRoverAckermannControl
+class GroundRoverAckermannControl : public ModuleParams
 {
 public:
 	GroundRoverAckermannControl();
@@ -68,16 +70,17 @@ public:
 
 private:
 
-	bool		_task_should_exit{false};		/**< if true, attitude control task should exit */
-	bool		_task_running{false};			/**< if true, task is running in its mainloop */
-	int		_control_task{-1};			/**< task handle */
+	bool	_task_should_exit{false};		/**< if true, attitude control task should exit */
+	bool	_task_running{false};			/**< if true, task is running in its mainloop */
+	int		_control_task{ -1};			/**< task handle */
 
-	int		_state_sub{-1};			/**< vehicle attitude setpoint */
-	int		_battery_status_sub{-1};		/**< battery status subscription */
-	int		_ackermann_sp_sub{-1};		/**< control state subscription */
-	int		_params_sub{-1};			/**< notification of parameter updates */
+	int		_state_sub{ -1};			/**< vehicle attitude setpoint */
+	int		_battery_status_sub{ -1};		/**< battery status subscription */
+	int		_ackermann_sp_sub{ -1};		/**< control state subscription */
+	int		_params_sub{ -1};			/**< notification of parameter updates */
 
 	orb_advert_t	_actuators_pub{nullptr};		/**< actuator control group 0 setpoint */
+	orb_advert_t	_debug_vect_pub{nullptr};		/**< debug */
 
 	uint64_t _timestamp_last{0};
 
@@ -88,37 +91,19 @@ private:
 	perf_counter_t	_nonfinite_input_perf;		/**< performance counter for non finite input */
 	perf_counter_t	_nonfinite_output_perf;		/**< performance counter for non finite output */
 
-	struct {
+	DEFINE_PARAMETERS(
+		(ParamFloat<px4::params::RAC_MDL_SK>) _param_mdl_sk,
+		(ParamFloat<px4::params::RAC_MDL_WB>) _param_mdl_wb,
+		(ParamFloat<px4::params::RAC_SR_P>) _param_sr_p,
+		(ParamFloat<px4::params::RAC_SR_I>) _param_sr_i,
+		(ParamFloat<px4::params::RAC_SR_D>) _param_sr_d,
+		(ParamInt<px4::params::RAC_BAT_SCALE>) _param_bat_scale_en
+	);
 
-		float v_max;		/**< Vehicle velocity limit */
-		float a_max;		/**< Vehicle acceleration limit */
-		float s_max;		/**< Vehicle steering limit */
+	//PID_t			_velocity_ctrl{};
+	PID_t			_steering_rate_ctrl{};
 
-		float v_p;			/**< Proportional gain of the velocity controller */
-
-		float a_t_tf;		/**< Factor mapping acceleration to torque */
-
-		int32_t bat_scale_en;			/**< Battery scaling enabled */
-
-	} _parameters{};			/**< local copies of interesting parameters */
-
-	struct {
-
-		param_t v_max;
-		param_t a_max;
-		param_t s_max;
-
-		param_t v_p;
-
-		param_t a_t_tf;
-
-		param_t bat_scale_en;
-
-	} _parameter_handles{};		/**< handles for interesting parameters */
-
-	PID_t			_velocity_ctrl{};
-
-	void		parameters_update();
+	void		parameters_update(int parameter_update_sub, bool force);
 
 	void		vehicle_ackermann_setpoint_poll();
 	void		battery_status_poll();

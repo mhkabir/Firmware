@@ -42,26 +42,6 @@
 PARAM_DEFINE_FLOAT(RAC_VEL_MAX, 10.0f);
 
 /**
- * Maximum lateral acceleration that can be commanded (magnitude)
- *
- * @unit m/s^2
- * @min 0.0
- * @max 10.0
- * @group Ground Rover Ackermann Control
- */
-PARAM_DEFINE_FLOAT(RAC_ACC_MAX, 1.0f);
-
-/**
- * Maximum angle of virtual steering wheel (magnitude)
- *
- * @unit rad
- * @min 0.0
- * @max 1.57
- * @group Ground Rover Ackermann Control
- */
-PARAM_DEFINE_FLOAT(RAC_STEER_MAX, 0.52f);
-
-/**
  * Velocity controller proportional gain
  *
  * This defines how much acceleration will be commanded depending on the
@@ -77,16 +57,63 @@ PARAM_DEFINE_FLOAT(RAC_STEER_MAX, 0.52f);
 PARAM_DEFINE_FLOAT(RAC_VEL_P, 1.0f);
 
 /**
- * Acceleration to torque transfer function
+ * Maximum steering rate that can be commanded (magnitude)
  *
- * This defines the factor mapping acceleration demand to normalized torque.
+ * @unit rad/s
+ * @min 0.0
+ * @max 1.0
+ * @group Ground Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_SR_MAX, 1.0f);
+
+/**
+ * Steering rate controller proportional gain
  *
- * @unit %/(m/s^2)
+ * @unit rad/s
+ * @min 0.0
+ * @max 1.0
+ * @group Ground Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_SR_P, 0.1f);
+
+/**
+ * Steering rate controller integral gain
+ *
+ * @unit rad/s
+ * @min 0.0
+ * @max 1.0
+ * @group Ground Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_SR_I, 1.0f);
+
+/**
+ * Steering rate controller derivative gain
+ *
+ * @unit rad/s
+ * @min 0.0
+ * @max 1.0
+ * @group Ground Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_SR_D, 0.01f);
+
+/**
+ * Feedforward controller wheelbase model parameter
+ *
+ * @unit m
  * @min 0.0
  * @max 1.0
  * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(RAC_ACC_TQ, 0.25f);
+PARAM_DEFINE_FLOAT(RAC_MDL_WB, 0.485f);
+/**
+ * Feedforward controller steering model parameter
+ *
+ * @unit %/rad
+ * @min 0.0
+ * @max 10.0
+ * @group Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_MDL_SK, 2.2f);
 
 /**
  * Whether to scale control effort by battery voltage level

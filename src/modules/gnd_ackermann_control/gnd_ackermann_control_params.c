@@ -97,7 +97,7 @@ PARAM_DEFINE_FLOAT(RAC_SR_I, 1.0f);
 PARAM_DEFINE_FLOAT(RAC_SR_D, 0.01f);
 
 /**
- * Feedforward controller wheelbase model parameter
+ * Steering feedforward controller wheelbase model parameter
  *
  * @unit m
  * @min 0.0
@@ -105,8 +105,9 @@ PARAM_DEFINE_FLOAT(RAC_SR_D, 0.01f);
  * @group Rover Ackermann Control
  */
 PARAM_DEFINE_FLOAT(RAC_MDL_WB, 0.485f);
+
 /**
- * Feedforward controller steering model parameter
+ * Steering feedforward controller steering model parameter
  *
  * @unit %/rad
  * @min 0.0
@@ -114,6 +115,25 @@ PARAM_DEFINE_FLOAT(RAC_MDL_WB, 0.485f);
  * @group Rover Ackermann Control
  */
 PARAM_DEFINE_FLOAT(RAC_MDL_SK, 2.2f);
+
+/**
+ * Velocity feedforward controller wheel radius model parameter
+ *
+ * @unit m
+ * @min 0.0
+ * @max 1.0
+ * @group Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_MDL_WR, 0.1015f);
+
+/**
+ * Velocity feedforward controller wheel to motor RPM model parameter
+ *
+ * @min 0.0
+ * @max 1000.0
+ * @group Rover Ackermann Control
+ */
+PARAM_DEFINE_FLOAT(RAC_MDL_WMR, 23.75f);
 
 /**
  * Whether to scale control effort by battery voltage level

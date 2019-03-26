@@ -120,18 +120,6 @@ GroundRoverAckermannControl::vehicle_ackermann_setpoint_poll()
 	}
 }
 
-void
-GroundRoverAckermannControl::battery_status_poll()
-{
-	/* check if there is a new message */
-	bool updated;
-	orb_check(_battery_status_sub, &updated);
-
-	if (updated) {
-		orb_copy(ORB_ID(battery_status), _battery_status_sub, &_battery_status);
-	}
-}
-
 int
 GroundRoverAckermannControl::task_main_trampoline(int argc, char *argv[])
 {
@@ -149,14 +137,12 @@ GroundRoverAckermannControl::task_main()
 	_state_sub = orb_subscribe(ORB_ID(vehicle_body_state));
 
 	_params_sub = orb_subscribe(ORB_ID(parameter_update));
-	_battery_status_sub = orb_subscribe(ORB_ID(battery_status));
 
 	// Get initial parameter set
 	parameters_update(_params_sub, true);
 
 	// Get an initial update for all sensor and status data
 	vehicle_ackermann_setpoint_poll();
-	battery_status_poll();
 
 	// Wakeup sources
 	px4_pollfd_struct_t fds[1];
@@ -202,7 +188,6 @@ GroundRoverAckermannControl::task_main()
 			orb_copy(ORB_ID(vehicle_body_state), _state_sub, &state);
 
 			vehicle_ackermann_setpoint_poll();
-			battery_status_poll();
 
 			actuator_controls_s	actuator_outputs{};
 
@@ -214,6 +199,7 @@ GroundRoverAckermannControl::task_main()
 				// Run yawrate controller
 				float steering_cmd = 0.0f;
 
+				// Only control steering if vehicle is in motion
 				if (fabsf(state.vx) > 0.1f) {
 					// Model-based feedforward controller
 					steering_cmd = _param_mdl_sk.get() * (atanf(_param_mdl_wb.get() * _ackermann_sp.steering_angle_velocity / state.vx));
@@ -223,15 +209,27 @@ GroundRoverAckermannControl::task_main()
 								      delta_t);
 				}
 
-				// Steering
+				// Steering command
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = steering_cmd;
+
+				// erpm/poles = motor_rpm
+				// motor_rpm/23.75 = wheel_rpm
+				// wheel_rpm * 2pi/60 = wheel_omega
+				// wheel_omega * wheel_r = v
+				
+				// Model-based feedforward controller
+				float erpm_cmd = (_ackermann_sp.speed / _param_mdl_wr.get()) * 		// omega_wheel
+								 (60.0f/(2.0f*M_PI_F)) * 							// rpm_wheel
+								 _param_mdl_wm_ratio.get() *						// rpm_motor
+								 _param_mdl_motor_poles.get() / 					// erpm_motor
+								 _param_mdl_erpm_scaler.get();						// erpm_scaled [-1,1]
 
 				////////////////////////////////////////////////
 				// Publish controller performance
 				debug_vect_s perf{};
-				perf.x = _ackermann_sp.steering_angle_velocity; // Setpoint (theta_dot_des)
-				perf.y = state.yawspeed; 						// Actual (theta_dot)
-				perf.z = steering_cmd; 							// Controller output (u)
+				perf.x = _ackermann_sp.speed; 		// Setpoint (v_des)
+				perf.y = state.vx; 				 	// Actual (v)
+				perf.z = erpm_cmd; 					// Controller output (u)
 
 				if (_debug_vect_pub != nullptr) {
 					orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &perf);
@@ -241,15 +239,8 @@ GroundRoverAckermannControl::task_main()
 				}
 				////////////////////////////////////////////////
 
-				float torque_cmd = _ackermann_sp.acceleration; // TODO : hack
-
-				// Compensate control effort for battery voltage drop if enabled
-				if (_parameters.bat_scale_en && _battery_status.scale > 0.0f) {
-					torque_sp *= _battery_status.scale;
-				}
-
-				// Torque command
-				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = torque_cmd;
+				// ERPM command
+				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = erpm_cmd;
 
 			} else if (_ackermann_sp.manual_passthrough) {
 

@@ -49,7 +49,6 @@
 #include <perf/perf_counter.h>
 
 #include <uORB/topics/actuator_controls.h>
-#include <uORB/topics/battery_status.h>
 #include <uORB/topics/vehicle_ackermann_setpoint.h>
 #include <uORB/topics/vehicle_body_state.h>
 #include <uORB/topics/parameter_update.h>
@@ -74,9 +73,8 @@ private:
 	bool	_task_running{false};			/**< if true, task is running in its mainloop */
 	int		_control_task{ -1};			/**< task handle */
 
-	int		_state_sub{ -1};			/**< vehicle attitude setpoint */
-	int		_battery_status_sub{ -1};		/**< battery status subscription */
-	int		_ackermann_sp_sub{ -1};		/**< control state subscription */
+	int		_state_sub{ -1};			/**< body frame state estimate */
+	int		_ackermann_sp_sub{ -1};		/**< ackermann setpoints */
 	int		_params_sub{ -1};			/**< notification of parameter updates */
 
 	orb_advert_t	_actuators_pub{nullptr};		/**< actuator control group 0 setpoint */
@@ -84,7 +82,6 @@ private:
 
 	uint64_t _timestamp_last{0};
 
-	battery_status_s				_battery_status {};		/**< battery status */
 	vehicle_ackermann_setpoint_s	_ackermann_sp {};		/**< setpoint */
 
 	perf_counter_t	_loop_perf;			/**< loop performance counter */
@@ -94,19 +91,22 @@ private:
 	DEFINE_PARAMETERS(
 		(ParamFloat<px4::params::RAC_MDL_SK>) _param_mdl_sk,
 		(ParamFloat<px4::params::RAC_MDL_WB>) _param_mdl_wb,
+		(ParamFloat<px4::params::RAC_MDL_WR>) _param_mdl_wr,
+		(ParamFloat<px4::params::RAC_MDL_WMR>) _param_mdl_wm_ratio,
 		(ParamFloat<px4::params::RAC_SR_P>) _param_sr_p,
 		(ParamFloat<px4::params::RAC_SR_I>) _param_sr_i,
 		(ParamFloat<px4::params::RAC_SR_D>) _param_sr_d,
-		(ParamInt<px4::params::RAC_BAT_SCALE>) _param_bat_scale_en
+		(ParamInt<px4::params::RAC_BAT_SCALE>) _param_bat_scale_en,
+		(ParamInt<px4::params::VESC_MOT_POLES>) _param_mdl_motor_poles,
+		(ParamInt<px4::params::VESC_MAX_ERPM>) _param_mdl_erpm_scaler
 	);
 
-	//PID_t			_velocity_ctrl{};
-	PID_t			_steering_rate_ctrl{};
+	PID_t		_velocity_ctrl{};
+	PID_t		_steering_rate_ctrl{};
 
 	void		parameters_update(int parameter_update_sub, bool force);
 
 	void		vehicle_ackermann_setpoint_poll();
-	void		battery_status_poll();
 
 	static int	task_main_trampoline(int argc, char *argv[]);
 	void		task_main();

@@ -102,3 +102,12 @@ PARAM_DEFINE_FLOAT(VESC_ANGLE_MIN, 0.0f);
  * @max 1.0
  */
 PARAM_DEFINE_FLOAT(VESC_ANGLE_MAX, 1.0f);
+
+/**
+ * Number of motor poles
+ *
+ * @group VESC
+ * @min 0
+ * @max 24
+ */
+PARAM_DEFINE_INT32(VESC_MOT_POLES, 2);

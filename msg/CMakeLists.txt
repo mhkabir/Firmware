@@ -121,10 +121,10 @@ set(msg_files
 	uavcan_parameter_value.msg
 	ulog_stream.msg
 	ulog_stream_ack.msg
+	vehicle_ackermann_setpoint.msg
 	vehicle_air_data.msg
 	vehicle_attitude.msg
 	vehicle_attitude_setpoint.msg
-	vehicle_ackermann_setpoint.msg
 	vehicle_body_state.msg
 	vehicle_command.msg
 	vehicle_command_ack.msg
@@ -142,6 +142,7 @@ set(msg_files
 	vehicle_status.msg
 	vehicle_status_flags.msg
 	vehicle_trajectory_waypoint.msg
+	vesc_state.msg
 	vtol_vehicle_status.msg
 	wind_estimate.msg
 	)

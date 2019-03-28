@@ -41,18 +41,25 @@
 
 #define VESC_DEVICE_PATH	"/dev/vesc"
 
-#define CURRENT_MAX 10.0f
-#define CURRENT_MIN 0.0f
-
-//#define PACKET_HEAD 0xfe
+// VESC packet properties
+#define MIN_PACKET_SIZE 5   		// Smallest packet size, in bytes
+#define SOF_VAL 2 					// Start of "small" packet value
+#define EOF_VAL 3             		// End-of-packet value
 
 #define MAX_BOOT_TIME_MS		 (550) // Minimum time to wait after power on before sending commands
 
-/*
 #pragma pack(push,1)
 
+// UART ringbuffer
+#define UART_BUFFER_SIZE 128
+typedef  struct {
+	uint8_t head;
+	uint8_t tail;
+	uint8_t length;
+	uint8_t data[UART_BUFFER_SIZE];
+} UARTBuffer;
 
-#pragma pack(pop)*/
+#pragma pack(pop)
 
 // Communication commands
 typedef enum {
@@ -93,15 +100,14 @@ typedef enum {
 	COMM_SET_CHUCK_DATA,
 	COMM_CUSTOM_APP_DATA,
 	COMM_NON
-} COMM_PACKET_ID;
+} VESCPacketID;
 
-/*
 typedef enum {
 	HEAD,
 	LEN,
-	ID,
-	DATA,
+	PAYLOAD,
 	CRC,
+	TAIL
 
-} PARSR_ESC_STATE;
-*/
+} ParserState;
+

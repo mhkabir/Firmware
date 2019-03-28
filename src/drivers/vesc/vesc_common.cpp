@@ -64,6 +64,10 @@ int initialise_uart(const char *const device, int &uart_fd)
 	// clear ONLCR flag (which appends a CR for every LF)
 	uart_config.c_oflag &= ~ONLCR;
 
+	// fetch bytes as they become available
+	uart_config.c_cc[VMIN] = 1;
+	uart_config.c_cc[VTIME] = 1;
+
 	// set baud rate
 	if (cfsetispeed(&uart_config, speed) < 0 || cfsetospeed(&uart_config, speed) < 0) {
 		PX4_ERR("failed to set baudrate for %s: %d\n", device, termios_state);
@@ -152,20 +156,19 @@ int send_payload(int uart_fd, uint8_t *payload, uint32_t len)
 	return ret;
 }
 
-/*
-int read_data_from_uart(int uart_fd, ESC_UART_BUF *const uart_buf)
+int read_uart(int uart_fd, UARTBuffer *const uart_buffer)
 {
-	uint8_t tmp_serial_buf[UART_BUFFER_SIZE];
+	// Read raw UART data into a persistent ringbuffer
+	uint8_t temp_buffer[UART_BUFFER_SIZE];
+	int len = ::read(uart_fd, temp_buffer, arraySize(temp_buffer));
 
-	int len =::read(uart_fd, tmp_serial_buf, arraySize(tmp_serial_buf));
-
-	if (len > 0 && (uart_buf->dat_cnt + len < UART_BUFFER_SIZE)) {
+	if (len > 0 && (uart_buffer->length + len < UART_BUFFER_SIZE)) {
 		for (int i = 0; i < len; i++) {
-			uart_buf->esc_feedback_buf[uart_buf->tail++] = tmp_serial_buf[i];
-			uart_buf->dat_cnt++;
+			uart_buffer->data[uart_buffer->tail++] = temp_buffer[i];
+			uart_buffer->length++;
 
-			if (uart_buf->tail >= UART_BUFFER_SIZE) {
-				uart_buf->tail = 0;
+			if (uart_buffer->tail >= UART_BUFFER_SIZE) {
+				uart_buffer->tail = 0;
 			}
 		}
 
@@ -174,94 +177,132 @@ int read_data_from_uart(int uart_fd, ESC_UART_BUF *const uart_buf)
 	}
 
 	return 0;
+
 }
 
-int parse_tap_esc_feedback(ESC_UART_BUF *const serial_buf, EscPacket *const packetdata)
+int parse_packet(UARTBuffer *const uart_buffer
+	, uint8_t *payload)
 {
-	static PARSR_ESC_STATE state = HEAD;
-	static uint8_t data_index = 0;
-	static uint8_t crc_data_cal;
+	static ParserState state = HEAD;
+	static uint8_t payload_data_len = 0;
+	static uint8_t payload_data[256 - MIN_PACKET_SIZE];
+	static uint8_t data_idx = 0;
+	static uint8_t crc[2];
 
-	if (serial_buf->dat_cnt > 0) {
-		int packet_len = serial_buf->dat_cnt;
+	static uint16_t crc_message;
+	static uint16_t crc_payload;
 
-		for (int i = 0; i < packet_len; i++) {
+	int bytes_available = uart_buffer->length;
+
+	if (bytes_available > MIN_PACKET_SIZE) {
+
+		for (int i = 0; i < bytes_available; i++) {
+			// Run parser
 			switch (state) {
 			case HEAD:
-				if (serial_buf->esc_feedback_buf[serial_buf->head] == PACKET_HEAD) {
-					packetdata->head = PACKET_HEAD; //just_keep the format
+				if (uart_buffer->data[uart_buffer->head] == SOF_VAL) {
 					state = LEN;
 				}
 
 				break;
 
 			case LEN:
-				if (serial_buf->esc_feedback_buf[serial_buf->head] < sizeof(packetdata->d)) {
-					packetdata->len = serial_buf->esc_feedback_buf[serial_buf->head];
-					state = ID;
-
-				} else {
-					state = HEAD;
-				}
-
+				payload_data_len = uart_buffer->data[uart_buffer->head];
+				state = PAYLOAD;
 				break;
 
-			case ID:
-				if (serial_buf->esc_feedback_buf[serial_buf->head] < ESCBUS_MSG_ID_MAX_NUM) {
-					packetdata->msg_id = serial_buf->esc_feedback_buf[serial_buf->head];
-					data_index = 0;
-					state = DATA;
+			case PAYLOAD:
+				payload_data[data_idx++] = uart_buffer->data[uart_buffer->head];
 
-				} else {
-					state = HEAD;
-				}
-
-				break;
-
-			case DATA:
-				packetdata->d.bytes[data_index++] = serial_buf->esc_feedback_buf[serial_buf->head];
-
-				if (data_index >= packetdata->len) {
-
-					crc_data_cal = crc8_esc((uint8_t *)(&packetdata->len), packetdata->len + 2);
+				if (data_idx == payload_data_len) {
+					// We have the full payload, compute CRC
+					crc_payload = crc16(payload_data, payload_data_len);
+					data_idx = 0;
 					state = CRC;
 				}
 
 				break;
 
 			case CRC:
-				if (crc_data_cal == serial_buf->esc_feedback_buf[serial_buf->head]) {
-					packetdata->crc_data = serial_buf->esc_feedback_buf[serial_buf->head];
+				crc[data_idx++] = uart_buffer->data[uart_buffer->head];
 
-					if (++serial_buf->head >= UART_BUFFER_SIZE) {
-						serial_buf->head = 0;
-					}
+				if (data_idx == 2) {
+					// We have the full CRC
+					crc_message = crc[0] << 8;
+					crc_message &= 0xFF00;
+					crc_message += crc[1];
 
-					serial_buf->dat_cnt--;
-					state = HEAD;
-					return 0;
+					data_idx = 0;
+					state = TAIL;
 				}
 
-				state = HEAD;
 				break;
 
-			default:
+			case TAIL:
+
+				// Check for end of frame
+				if (uart_buffer->data[uart_buffer->head] == EOF_VAL) {
+
+					if (crc_message == crc_payload) {
+
+						// Parsed payload
+						memcpy(payload, payload_data, payload_data_len);
+
+						// Handle ringbuffer loopback
+						if (++uart_buffer->head >= UART_BUFFER_SIZE) {
+							uart_buffer->head = 0;
+						}
+
+						uart_buffer->length--;
+
+						state = HEAD;
+						return payload_data_len;
+
+					} else {
+						PX4_ERR("CRC incorrect");
+					}
+
+				} else {
+					PX4_ERR("Parser out of sync");
+				}
+
+				payload_data_len = 0;
+				data_idx = 0;
 				state = HEAD;
 				break;
-
 			}
 
-			if (++serial_buf->head >= UART_BUFFER_SIZE) {
-				serial_buf->head = 0;
+			// Handle ringbuffer loopback
+			if (++uart_buffer->head >= UART_BUFFER_SIZE) {
+				uart_buffer->head = 0;
 			}
 
-			serial_buf->dat_cnt--;
+			uart_buffer->length--;
 		}
+	}
+
+	return 0;
+}
+
+int unpack_payload(uint8_t *payload, uint8_t payload_len, float &erpm)
+{
+	uint8_t packet_id = payload[0];
+	int32_t index = 0;
+
+	switch (packet_id) {
+	case COMM_GET_VALUES:
+		index = 25; // Skip the first 25 bits.
+		erpm = buffer_get_float32(payload, 1.0f, &index);
+		return 0;
+		break;
+
+	default:
+		PX4_WARN("Got unexpected packet %d", packet_id);
+		break;
 	}
 
 	return -1;
 }
-*/
 
 static uint16_t crc16(unsigned char *buf, uint8_t len)
 {
@@ -307,7 +348,69 @@ const uint16_t crc_table[256] = { 0x0000, 0x1021, 0x2042, 0x3063, 0x4084,
 				};
 
 // Buffer functions
+
+// Reading functions
+uint8_t buffer_get_uint8(const uint8_t *buffer, int32_t *index)
+{
+	uint8_t res = buffer[*index];
+	*index += 1;
+	return res;
+}
+
+// Reading functions
+int16_t buffer_get_int16(const uint8_t *buffer, int32_t *index)
+{
+	int16_t res =	((uint16_t) buffer[*index]) << 8 |
+			((uint16_t) buffer[*index + 1]);
+	*index += 2;
+	return res;
+}
+
+uint16_t buffer_get_uint16(const uint8_t *buffer, int32_t *index)
+{
+	uint16_t res =	((uint16_t) buffer[*index]) << 8 |
+			((uint16_t) buffer[*index + 1]);
+	*index += 2;
+	return res;
+}
+
+int32_t buffer_get_int32(const uint8_t *buffer, int32_t *index)
+{
+	int32_t res =	((uint32_t) buffer[*index]) << 24 |
+			((uint32_t) buffer[*index + 1]) << 16 |
+			((uint32_t) buffer[*index + 2]) << 8 |
+			((uint32_t) buffer[*index + 3]);
+	*index += 4;
+	return res;
+}
+
+uint32_t buffer_get_uint32(const uint8_t *buffer, int32_t *index)
+{
+	uint32_t res =	((uint32_t) buffer[*index]) << 24 |
+			((uint32_t) buffer[*index + 1]) << 16 |
+			((uint32_t) buffer[*index + 2]) << 8 |
+			((uint32_t) buffer[*index + 3]);
+	*index += 4;
+	return res;
+}
+float buffer_get_float16(const uint8_t *buffer, float scale, int32_t *index)
+{
+	return (float)buffer_get_int16(buffer, index) / scale;
+}
+
+float buffer_get_float32(const uint8_t *buffer, float scale, int32_t *index)
+{
+	return (float)buffer_get_int32(buffer, index) / scale;
+}
+
+// Addition functions
 void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t *index)
+{
+	buffer[(*index)++] = number >> 8;
+	buffer[(*index)++] = number;
+}
+
+void buffer_append_uint16(uint8_t *buffer, uint16_t number, int32_t *index)
 {
 	buffer[(*index)++] = number >> 8;
 	buffer[(*index)++] = number;
@@ -319,6 +422,24 @@ void buffer_append_int32(uint8_t *buffer, int32_t number, int32_t *index)
 	buffer[(*index)++] = number >> 16;
 	buffer[(*index)++] = number >> 8;
 	buffer[(*index)++] = number;
+}
+
+void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t *index)
+{
+	buffer[(*index)++] = number >> 24;
+	buffer[(*index)++] = number >> 16;
+	buffer[(*index)++] = number >> 8;
+	buffer[(*index)++] = number;
+}
+
+void buffer_append_float16(uint8_t *buffer, float number, float scale, int32_t *index)
+{
+	buffer_append_int16(buffer, (int16_t)(number * scale), index);
+}
+
+void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t *index)
+{
+	buffer_append_int32(buffer, (int32_t)(number * scale), index);
 }
 
 } /* vesc_common */

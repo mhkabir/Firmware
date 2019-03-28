@@ -211,11 +211,6 @@ GroundRoverAckermannControl::task_main()
 
 				// Steering command
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = steering_cmd;
-
-				// erpm/poles = motor_rpm
-				// motor_rpm/23.75 = wheel_rpm
-				// wheel_rpm * 2pi/60 = wheel_omega
-				// wheel_omega * wheel_r = v
 				
 				// Model-based feedforward controller
 				float erpm_cmd = (_ackermann_sp.speed / _param_mdl_wr.get()) * 		// omega_wheel

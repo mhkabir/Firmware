@@ -51,6 +51,7 @@
 #include <uORB/topics/actuator_controls.h>
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/parameter_update.h>
+#include <uORB/topics/vesc_state.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
@@ -70,6 +71,7 @@
 #  define VESC_CTRL_UORB_UPDATE_INTERVAL 2  // [ms] min: 2, max: 100
 #endif
 
+using namespace time_literals;
 /*
  * This driver connects to VESCs via serial.
  */
@@ -100,6 +102,7 @@ public:
 private:
 	char 			_device[DEVICE_ARGUMENT_MAX_LENGTH];
 	int 			_uart_fd = -1;
+	UARTBuffer 		_uart_buffer = {};
 	bool 			_is_armed = false;
 	int				_armed_sub = -1;
 	int 			_params_sub = -1;
@@ -107,25 +110,30 @@ private:
 
 	int			_control_sub;
 	actuator_controls_s	_control;
-	px4_pollfd_struct_t	_poll_fd;
+	px4_pollfd_struct_t	_poll_fds[2];
+
+	orb_advert_t _state_pub = nullptr;
+
+	hrt_abstime _last_request_time = 0;
 
 	void subscribe();
 	void send_erpm_sp(int32_t erpm);
 	void send_current_sp(float current);
 	void send_brake_current_sp(float current);
 	void send_steering_sp(float angle);
+	void send_feedback_request();
 
 	void update_params(bool force = false);
 
 	/** @note Declare local parameters using defined parameters. */
 	DEFINE_PARAMETERS(
-		(ParamInt<px4::params::VESC_CTL_MODE>)  _p_control_mode,
-		(ParamInt<px4::params::VESC_MAX_ERPM>)  _p_max_erpm,
-		(ParamFloat<px4::params::VESC_MAX_CURRENT>)  _p_max_current,
-		(ParamFloat<px4::params::VESC_BRK_CURRENT>)  _p_max_braking_current,
-		(ParamFloat<px4::params::VESC_ANGLE_TRIM>)  _p_angle_trim,
-		(ParamFloat<px4::params::VESC_ANGLE_MIN>)  _p_angle_min,
-		(ParamFloat<px4::params::VESC_ANGLE_MAX>)  _p_angle_max
+		(ParamInt<px4::params::VESC_CTL_MODE>)  _param_control_mode,
+		(ParamInt<px4::params::VESC_MAX_ERPM>)  _param_max_erpm,
+		(ParamFloat<px4::params::VESC_MAX_CURRENT>)  _param_max_current,
+		(ParamFloat<px4::params::VESC_BRK_CURRENT>)  _param_max_braking_current,
+		(ParamFloat<px4::params::VESC_ANGLE_TRIM>)  _param_angle_trim,
+		(ParamFloat<px4::params::VESC_ANGLE_MIN>)  _param_angle_min,
+		(ParamFloat<px4::params::VESC_ANGLE_MAX>)  _param_angle_max
 	)
 
 };
@@ -230,8 +238,13 @@ int VESC::init()
 
 	update_params(true);
 
-	_poll_fd.fd = _control_sub;
-	_poll_fd.events = POLLIN;
+	// Primary wakeup source
+	_poll_fds[0].fd = _control_sub;
+	_poll_fds[0].events = POLLIN;
+
+	// Secondary wakeup source
+	_poll_fds[1].fd = _uart_fd;
+	_poll_fds[1].events = POLLIN;
 
 	return ret;
 }
@@ -276,7 +289,7 @@ void VESC::send_brake_current_sp(float current)
 	int32_t index = 0;
 	uint8_t payload[5];
 
-	payload[index++] = COMM_SET_CURRENT_BRAKE ;
+	payload[index++] = COMM_SET_CURRENT_BRAKE;
 	vesc_common::buffer_append_int32(payload, int32_t(current * 1000), &index);
 
 	// Send packet
@@ -293,7 +306,7 @@ void VESC::send_steering_sp(float angle)
 	int32_t index = 0;
 	uint8_t payload[3];
 
-	payload[index++] = COMM_SET_SERVO_POS ;
+	payload[index++] = COMM_SET_SERVO_POS;
 	vesc_common::buffer_append_int16(payload, int16_t(angle * 1000), &index);
 
 	// Send packet
@@ -304,50 +317,65 @@ void VESC::send_steering_sp(float angle)
 	}
 }
 
+void VESC::send_feedback_request()
+{
+	// Create packet payload
+	uint8_t payload[1];
+
+	payload[0] = COMM_GET_VALUES;
+
+	// Send packet
+	int ret = vesc_common::send_payload(_uart_fd, payload, 1);
+
+	if (ret < 1) {
+		PX4_ERR("TX ERROR: ret: %d, errno: %d", ret, errno);
+	}
+}
+
 void VESC::cycle()
 {
 	/* check if anything updated */
-	int ret = px4_poll(&_poll_fd, 1, 5);
+	int ret = px4_poll(_poll_fds, 2, 100);
 
 	/* this would be bad... */
 	if (ret < 0) {
 		PX4_ERR("poll error %d", errno);
 		return;
 
-	} else if (_poll_fd.revents & POLLIN) {
+	} else if (_poll_fds[0].revents & POLLIN) { // Control data
 		orb_copy(ORB_ID(actuator_controls_0), _control_sub, &_control);
 
 		// Yaw is normalized [-1, 1]
 		float yaw_target = -math::constrain(_control.control[actuator_controls_s::INDEX_YAW], -1.0f, 1.0f);
-		float steering_sp = _p_angle_trim.get();
+		float steering_sp = _param_angle_trim.get();
 
 		if (yaw_target < 0.0f) {
 			// Map -1 to 0 from angle_min to angle_trim
-			steering_sp = _p_angle_min.get() + ((_p_angle_trim.get() - _p_angle_min.get()) * (yaw_target + 1.0f));
+			steering_sp = _param_angle_min.get() + ((_param_angle_trim.get() - _param_angle_min.get()) * (yaw_target + 1.0f));
 
 		} else if (yaw_target > 0.0f) {
 			// Map 0 to 1 from angle_trim to angle_max
-			steering_sp = _p_angle_trim.get() + ((_p_angle_max.get() - _p_angle_trim.get()) * yaw_target);
+			steering_sp = _param_angle_trim.get() + ((_param_angle_max.get() - _param_angle_trim.get()) * yaw_target);
 		}
 
 		send_steering_sp(steering_sp);
 
-		if (_p_control_mode.get() == 0) { // Current control mode
+		if (_param_control_mode.get() == 0) { // Current control mode
 			// Throttle is normalized [-1, 1]
 			float current_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f,
-							   1.0f) * _p_max_current.get();
+							   1.0f) * _param_max_current.get();
 			send_current_sp(current_sp);
 
 			// Brake is normalized [0, 1]
 			if (_control.control[actuator_controls_s::INDEX_AIRBRAKES] > 0.0f) {
-				float braking_current_sp = -_control.control[actuator_controls_s::INDEX_AIRBRAKES] * _p_max_braking_current.get();
+				float braking_current_sp = -_control.control[actuator_controls_s::INDEX_AIRBRAKES] * _param_max_braking_current.get();
 				send_brake_current_sp(braking_current_sp);
 			}
 
-		} else if (_p_control_mode.get() == 1) { // ERPM control mode
+		} else if (_param_control_mode.get() == 1) { // ERPM control mode
 			// Throttle is normalized [-1, 1]
 			int32_t erpm_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f,
-							  1.0f) * _p_max_erpm.get();
+							  1.0f) * _param_max_erpm.get();
 
 			// Brake is normalized [0, 1]
 			if (_control.control[actuator_controls_s::INDEX_AIRBRAKES] > 0.0f) {
@@ -356,6 +384,38 @@ void VESC::cycle()
 
 			send_erpm_sp(erpm_sp);
 		}
+
+	} else if (_poll_fds[1].revents & POLLIN) { // ESC feedback
+
+		// Read UART bytes into ringbuffer
+		if (vesc_common::read_uart(_uart_fd, &_uart_buffer) < 0) {
+			PX4_ERR("RX ERR failed");
+		}
+
+		// Try to parse message payload
+		uint8_t payload[256 - MIN_PACKET_SIZE];
+		uint8_t payload_len = vesc_common::parse_packet(&_uart_buffer, payload);
+
+		if (payload_len > 0) {
+			float erpm = 0.0f;
+			if (vesc_common::unpack_payload(payload, payload_len, erpm) >= 0) {
+
+				vesc_state_s state{};
+				state.timestamp = hrt_absolute_time();
+				state.erpm = fabsf(erpm) > 50.0f ? erpm : 0.0f;
+				state.steering_angle = _control.control[actuator_controls_s::INDEX_YAW]; // _param_model_sk;
+
+				int instance;
+				orb_publish_auto(ORB_ID(vesc_state), &_state_pub, &state, &instance, ORB_PRIO_HIGH);
+
+			}
+		}
+	}
+
+	// Request ESC feedback
+	if (hrt_elapsed_time(&_last_request_time) > 10_ms) {
+		send_feedback_request();
+		_last_request_time = hrt_absolute_time();
 	}
 
 	bool updated;

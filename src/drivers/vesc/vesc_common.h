@@ -75,25 +75,46 @@ int send_payload(int uart_fd, uint8_t *payload, uint32_t len);
 /**
  *  Read data from the UART into a buffer
  *  @param uart_fd file-descriptor of UART device
- *  @param uart_buf Buffer where incoming data will be stored
+ *  @param uart_buffer Buffer where incoming data will be stored
  *  @return 0 on success, -1 on error
  */
-//int read_data_from_uart(int uart_fd, ESC_UART_BUF *const uart_buf);
+int read_uart(int uart_fd, UARTBuffer *const uart_buffer);
 
 /**
- *  Parse feedback from ESC
- *  @param serial_buf Buffer where incoming data will be stored
- *  @param packetdata Packet that will be populated with information from buffer
+ *  Parse packets from ESC
+ *  @param uart_buffer Buffer where incoming data will be stored
+ *  @param payload
+ *  @param payload_len
+ *  @return On success length of payload, on error -1
+ */
+int parse_packet(UARTBuffer *const uart_buffer, uint8_t *payload);
+
+/**
+ *  Parse status message payload
+ *  @param payload
+ *  @param payload_len
+ *  @param feedback
  *  @return 0 on success, -1 on error
  */
-//int parse_vesc_feedback(ESC_UART_BUF *const serial_buf, EscPacket *const packetdata);
+int unpack_payload(uint8_t *payload, uint8_t payload_len, float &erpm);
 
 /**
  *  Lookup-table for faster CRC computation when sending ESC packets.
  */
 extern const uint16_t crc_table[];
 
+int16_t buffer_get_int16(const uint8_t *buffer, int32_t *index);
+uint16_t buffer_get_uint16(const uint8_t *buffer, int32_t *index);
+int32_t buffer_get_int32(const uint8_t *buffer, int32_t *index);
+uint32_t buffer_get_uint32(const uint8_t *buffer, int32_t *index);
+float buffer_get_float16(const uint8_t *buffer, float scale, int32_t *index);
+float buffer_get_float32(const uint8_t *buffer, float scale, int32_t *index);
+
 void buffer_append_int16(uint8_t *buffer, int16_t number, int32_t *index);
+void buffer_append_uint16(uint8_t *buffer, uint16_t number, int32_t *index);
 void buffer_append_int32(uint8_t *buffer, int32_t number, int32_t *index);
+void buffer_append_uint32(uint8_t *buffer, uint32_t number, int32_t *index);
+void buffer_append_float16(uint8_t *buffer, float number, float scale, int32_t *index);
+void buffer_append_float32(uint8_t *buffer, float number, float scale, int32_t *index);
 
 } /* vesc_common */

@@ -96,7 +96,6 @@ private:
 		(ParamFloat<px4::params::RAC_SR_P>) _param_sr_p,
 		(ParamFloat<px4::params::RAC_SR_I>) _param_sr_i,
 		(ParamFloat<px4::params::RAC_SR_D>) _param_sr_d,
-		(ParamInt<px4::params::RAC_BAT_SCALE>) _param_bat_scale_en,
 		(ParamInt<px4::params::VESC_MOT_POLES>) _param_mdl_motor_poles,
 		(ParamInt<px4::params::VESC_MAX_ERPM>) _param_mdl_erpm_scaler
 	);

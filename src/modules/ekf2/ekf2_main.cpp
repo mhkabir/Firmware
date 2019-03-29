@@ -75,6 +75,7 @@
 #include <uORB/topics/vehicle_odometry.h>
 #include <uORB/topics/vehicle_status.h>
 #include <uORB/topics/wind_estimate.h>
+#include <uORB/topics/wheel_odometry.h>
 
 // defines used to specify the mask position for use of different accuracy metrics in the GPS blending algorithm
 #define BLEND_MASK_USE_SPD_ACC      1
@@ -265,6 +266,7 @@ private:
 	int _sensors_sub{ -1};
 	int _status_sub{ -1};
 	int _vehicle_land_detected_sub{ -1};
+	int _wheel_odometry_sub{ -1};
 
 	// because we can have several distance sensor instances with different orientations
 	int _range_finder_subs[ORB_MULTI_MAX_INSTANCES] {};
@@ -642,6 +644,7 @@ Ekf2::Ekf2():
 	_sensors_sub = orb_subscribe(ORB_ID(sensor_combined));
 	_status_sub = orb_subscribe(ORB_ID(vehicle_status));
 	_vehicle_land_detected_sub = orb_subscribe(ORB_ID(vehicle_land_detected));
+	_wheel_odometry_sub = orb_subscribe(ORB_ID(wheel_odometry));
 
 	for (unsigned i = 0; i < GPS_MAX_RECEIVERS; i++) {
 		_gps_subs[i] = orb_subscribe_multi(ORB_ID(vehicle_gps_position), i);
@@ -671,6 +674,7 @@ Ekf2::~Ekf2()
 	orb_unsubscribe(_sensors_sub);
 	orb_unsubscribe(_status_sub);
 	orb_unsubscribe(_vehicle_land_detected_sub);
+	orb_unsubscribe(_wheel_odometry_sub);
 
 	for (unsigned i = 0; i < ORB_MULTI_MAX_INSTANCES; i++) {
 		orb_unsubscribe(_range_finder_subs[i]);
@@ -1302,6 +1306,20 @@ void Ekf2::run()
 			}
 		}
 
+		// use wheel odometry as another source of velocity data
+		bool wheel_odometry_updated = false;
+		orb_check(_wheel_odometry_sub, &wheel_odometry_updated);
+
+		if (wheel_odometry_updated) {
+			wheel_odometry_s odom;
+
+			if (orb_copy(ORB_ID(wheel_odometry), _wheel_odometry_sub, &odom) == PX4_OK) {
+				float velocity[2] = {odom.vx, odom.vy};
+				float variance[2] = {0.5f, 0.5f};
+				_ekf.setAuxVelData(odom.timestamp, velocity, variance);
+			}
+		}
+
 		perf_end(_perf_update_data);
 
 		// run the EKF update and output
@@ -1614,7 +1632,7 @@ void Ekf2::run()
 				bstate.yawspeed = sensors.gyro_rad[2] - gyro_bias[2];
 
 				// Body frame velocity estimate
-				if (_ekf.local_position_is_valid()) {
+				if (_ekf.local_position_is_valid() || control_status.flags.aux_vel) {
 					// Rotate velocity vector to body frame using attitude estimate
 					matrix::Vector3f velocity {vel[0], vel[1], vel[2]};
 					velocity = q_att.conjugate_inversed(velocity);

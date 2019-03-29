@@ -52,6 +52,7 @@
 #include <uORB/topics/actuator_armed.h>
 #include <uORB/topics/parameter_update.h>
 #include <uORB/topics/vesc_state.h>
+#include <uORB/topics/wheel_odometry.h>
 
 #include <drivers/drv_hrt.h>
 #include <drivers/drv_mixer.h>
@@ -70,6 +71,8 @@
 #if !defined(VESC_CTRL_UORB_UPDATE_INTERVAL)
 #  define VESC_CTRL_UORB_UPDATE_INTERVAL 2  // [ms] min: 2, max: 100
 #endif
+
+#define RPM_TO_RAD_S 60.0f/(2.0f*M_PI_F)
 
 using namespace time_literals;
 /*
@@ -113,6 +116,7 @@ private:
 	px4_pollfd_struct_t	_poll_fds[2];
 
 	orb_advert_t _state_pub = nullptr;
+	orb_advert_t _odom_pub = nullptr;
 
 	hrt_abstime _last_request_time = 0;
 
@@ -129,11 +133,15 @@ private:
 	DEFINE_PARAMETERS(
 		(ParamInt<px4::params::VESC_CTL_MODE>)  _param_control_mode,
 		(ParamInt<px4::params::VESC_MAX_ERPM>)  _param_max_erpm,
+		(ParamInt<px4::params::VESC_MOT_POLES>)  _param_motor_poles,
 		(ParamFloat<px4::params::VESC_MAX_CURRENT>)  _param_max_current,
 		(ParamFloat<px4::params::VESC_BRK_CURRENT>)  _param_max_braking_current,
 		(ParamFloat<px4::params::VESC_ANGLE_TRIM>)  _param_angle_trim,
 		(ParamFloat<px4::params::VESC_ANGLE_MIN>)  _param_angle_min,
-		(ParamFloat<px4::params::VESC_ANGLE_MAX>)  _param_angle_max
+		(ParamFloat<px4::params::VESC_ANGLE_MAX>)  _param_angle_max,
+		(ParamFloat<px4::params::RAC_MDL_SK>)  _param_mdl_sk,
+		(ParamFloat<px4::params::RAC_MDL_WMR>)  _param_mdl_wmr,
+		(ParamFloat<px4::params::RAC_MDL_WR>)  _param_mdl_wr
 	)
 
 };
@@ -403,10 +411,28 @@ void VESC::cycle()
 				vesc_state_s state{};
 				state.timestamp = hrt_absolute_time();
 				state.erpm = fabsf(erpm) > 50.0f ? erpm : 0.0f;
-				state.steering_angle = _control.control[actuator_controls_s::INDEX_YAW]; // _param_model_sk;
+				state.steering_angle = _control.control[actuator_controls_s::INDEX_YAW] / _param_mdl_sk.get(); // TODO : use delayed command
 
 				int instance;
 				orb_publish_auto(ORB_ID(vesc_state), &_state_pub, &state, &instance, ORB_PRIO_HIGH);
+
+				// erpm/poles = motor_rpm
+				// motor_rpm/23.75 = wheel_rpm
+				// wheel_rpm * 2pi/60 = wheel_omega
+				// wheel_omega * wheel_r = v
+
+				// Wheel velocity
+				float wheel_v = state.erpm / (_param_motor_poles.get() * _param_mdl_wmr.get() * RPM_TO_RAD_S) * _param_mdl_wr.get();
+
+				// Steering angle
+				float wheel_alpha = state.steering_angle;
+
+				wheel_odometry_s odom{};
+				odom.timestamp = state.timestamp;
+				odom.vx = wheel_v * (1 + cosf(wheel_alpha)) / 2.0f;
+				odom.vy = wheel_v * sinf(wheel_alpha);
+
+				orb_publish_auto(ORB_ID(wheel_odometry), &_odom_pub, &odom, &instance, ORB_PRIO_HIGH);
 
 			}
 		}

@@ -97,17 +97,23 @@ PARAM_DEFINE_FLOAT(RAC_SR_I, 1.0f);
 PARAM_DEFINE_FLOAT(RAC_SR_D, 0.01f);
 
 /**
- * Steering feedforward controller wheelbase model parameter
+ * Wheelbase model parameter
+ *
+ * Taken from vehicle datasheet.
  *
  * @unit m
  * @min 0.0
  * @max 1.0
  * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(RAC_MDL_WB, 0.485f);
+PARAM_DEFINE_FLOAT(RAC_MDL_WB, 0.480f);
 
 /**
- * Steering feedforward controller steering model parameter
+ * Steering model parameter
+ *
+ * Found using yawrate and velocity feedback during driving with turns.
+ *
+ * steering_angle_rad = steering_angle_norm / RAC_MDL_SK
  *
  * @unit %/rad
  * @min 0.0
@@ -117,7 +123,9 @@ PARAM_DEFINE_FLOAT(RAC_MDL_WB, 0.485f);
 PARAM_DEFINE_FLOAT(RAC_MDL_SK, 2.2f);
 
 /**
- * Velocity feedforward controller wheel radius model parameter
+ * Wheel radius model parameter
+ *
+ * Taken from vehicle datasheet.
  *
  * @unit m
  * @min 0.0
@@ -127,23 +135,15 @@ PARAM_DEFINE_FLOAT(RAC_MDL_SK, 2.2f);
 PARAM_DEFINE_FLOAT(RAC_MDL_WR, 0.1015f);
 
 /**
- * Velocity feedforward controller wheel to motor RPM model parameter
+ * Wheel to motor RPM model parameter
+ *
+ * Taken from vehicle datasheet. Default: 8.11 * (54/18)
+ * RAC_MDL_WMR = overall_drive_ratio * (spur_gear_teeth/pinion_gear_teeth)
+ *
+ * motor_rpm = wheel_rpm * RAC_MDL_WMR
  *
  * @min 0.0
- * @max 1000.0
+ * @max 50.0
  * @group Rover Ackermann Control
  */
-PARAM_DEFINE_FLOAT(RAC_MDL_WMR, 23.75f);
-
-/**
- * Whether to scale control effort by battery voltage level
- *
- * This compensates for voltage drop of the battery over time by attempting to
- * normalize performance across the operating range of the battery. The vehicle
- * should constantly behave as if it was fully charged with reduced max torque
- * at lower battery percentages.
- *
- * @boolean
- * @group Rover Ackermann Control
- */
-PARAM_DEFINE_INT32(RAC_BAT_SCALE, 1);
+PARAM_DEFINE_FLOAT(RAC_MDL_WMR, 24.33f);

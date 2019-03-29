@@ -145,6 +145,7 @@ set(msg_files
 	vesc_state.msg
 	vtol_vehicle_status.msg
 	wind_estimate.msg
+	wheel_odometry.msg
 	)
 
 if(NOT EXTERNAL_MODULES_LOCATION STREQUAL "")

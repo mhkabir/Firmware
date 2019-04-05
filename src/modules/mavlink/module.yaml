@@ -8,7 +8,7 @@ serial_config:
         then
             set MAV_ARGS "${MAV_ARGS} -f"
         fi
-        mavlink start -d ${SERIAL_DEV} ${MAV_ARGS} -x
+        mavlink start -d ${SERIAL_DEV} ${MAV_ARGS} -x -z
       port_config_param:
         name: MAV_${i}_CONFIG
         group: MAVLink

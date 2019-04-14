@@ -3,6 +3,9 @@
 # PX4 FMUv5 specific board sensors init
 #------------------------------------------------------------------------------
 
+# External SPI bus ADIS16497
+adis16497 start
+
 # Internal SPI bus ICM-20602
 mpu6000 -R 8 -s -T 20602 start
 
@@ -26,4 +29,4 @@ ist8310 -C -b 2 start
 ist8310 -C -b 5 start
 
 # Possible pmw3901 optical flow sensor
-pmw3901 start
+# pmw3901 start

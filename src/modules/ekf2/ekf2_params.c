@@ -931,6 +931,33 @@ PARAM_DEFINE_FLOAT(EKF2_EV_POS_Y, 0.0f);
 PARAM_DEFINE_FLOAT(EKF2_EV_POS_Z, 0.0f);
 
 /**
+* X position of auxiliary velocity measurement point in body frame
+ *
+ * @group EKF2
+ * @unit m
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(EKF2_AV_POS_X, 0.0f);
+
+/**
+ * Y position of auxiliary velocity measurement point in body frame
+ *
+ * @group EKF2
+ * @unit m
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(EKF2_AV_POS_Y, 0.0f);
+
+/**
+ * Z position of auxiliary velocity measurement point in body frame
+ *
+ * @group EKF2
+ * @unit m
+ * @decimal 3
+ */
+PARAM_DEFINE_FLOAT(EKF2_AV_POS_Z, 0.0f);
+
+/**
 * Airspeed fusion threshold. A value of zero will deactivate airspeed fusion. Any other positive
 * value will determine the minimum airspeed which will still be fused. Set to about 90% of the vehicles stall speed.
 * Both airspeed fusion and sideslip fusion must be active for the EKF to continue navigating after loss of GPS.

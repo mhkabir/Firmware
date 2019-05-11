@@ -455,6 +455,12 @@ private:
 		_param_ekf2_ev_pos_y,		///< Y position of VI sensor focal point in body frame (m)
 		(ParamExtFloat<px4::params::EKF2_EV_POS_Z>)
 		_param_ekf2_ev_pos_z,		///< Z position of VI sensor focal point in body frame (m)
+		(ParamExtFloat<px4::params::EKF2_AV_POS_X>)
+		_param_ekf2_av_pos_x,		///< X position of auxiliary velocity measurement point in body frame (m)
+		(ParamExtFloat<px4::params::EKF2_AV_POS_Y>)
+		_param_ekf2_av_pos_y,		///< Y position of auxiliary velocity measurement point in body frame (m)
+		(ParamExtFloat<px4::params::EKF2_AV_POS_Z>)
+		_param_ekf2_av_pos_z,		///< Y position of auxiliary velocity measurement point in body frame (m)
 
 		// control of airspeed and sideslip fusion
 		(ParamFloat<px4::params::EKF2_ARSP_THR>)
@@ -619,6 +625,9 @@ Ekf2::Ekf2():
 	_param_ekf2_ev_pos_x(_params->ev_pos_body(0)),
 	_param_ekf2_ev_pos_y(_params->ev_pos_body(1)),
 	_param_ekf2_ev_pos_z(_params->ev_pos_body(2)),
+	_param_ekf2_av_pos_x(_params->auxvel_pos_body(0)),
+	_param_ekf2_av_pos_y(_params->auxvel_pos_body(1)),
+	_param_ekf2_av_pos_z(_params->auxvel_pos_body(2)),
 	_param_ekf2_tau_vel(_params->vel_Tau),
 	_param_ekf2_tau_pos(_params->pos_Tau),
 	_param_ekf2_gbias_init(_params->switch_on_gyro_bias),
@@ -1308,7 +1317,7 @@ void Ekf2::run()
 
 		// use wheel odometry as another source of velocity data
 		bool wheel_odometry_updated = false;
-		orb_check(_wheel_odometry_sub, &wheel_odometry_updated);
+		//orb_check(_wheel_odometry_sub, &wheel_odometry_updated);
 
 		if (wheel_odometry_updated) {
 			wheel_odometry_s odom;

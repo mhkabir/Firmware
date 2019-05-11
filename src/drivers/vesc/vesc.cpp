@@ -368,7 +368,7 @@ void VESC::cycle()
 
 		send_steering_sp(steering_sp);
 
-		if (_param_control_mode.get() == 0) { // Current control mode
+		if (_param_control_mode.get() == 0 || _control.control[actuator_controls_s::INDEX_SPOILERS] > 0.0f) { // Current control mode
 			// Throttle is normalized [-1, 1]
 			float current_sp = math::constrain(_control.control[actuator_controls_s::INDEX_THROTTLE], -1.0f,
 							   1.0f) * _param_max_current.get();
@@ -427,9 +427,10 @@ void VESC::cycle()
 				// Steering angle
 				float wheel_alpha = state.steering_angle;
 
+				// Wheel odometry in the vehicle body frame, measured at the front axle
 				wheel_odometry_s odom{};
 				odom.timestamp = state.timestamp;
-				odom.vx = wheel_v * (1 + cosf(wheel_alpha)) / 2.0f;
+				odom.vx = wheel_v * cosf(wheel_alpha);
 				odom.vy = wheel_v * sinf(wheel_alpha);
 
 				orb_publish_auto(ORB_ID(wheel_odometry), &_odom_pub, &odom, &instance, ORB_PRIO_HIGH);

@@ -196,6 +196,9 @@ GroundRoverAckermannControl::task_main()
 			    PX4_ISFINITE(state.vx) &&
 			    PX4_ISFINITE(state.yawspeed)) {
 
+				// Hack for using torque setpoints in manual mode
+				actuator_outputs.control[actuator_controls_s::INDEX_SPOILERS] = 0.0f;
+
 				// Run yawrate controller
 				float steering_cmd = 0.0f;
 
@@ -207,6 +210,21 @@ GroundRoverAckermannControl::task_main()
 					// Run feedback controller on top
 					steering_cmd += pid_calculate(&_steering_rate_ctrl, _ackermann_sp.steering_angle_velocity, state.yawspeed, 0.0f,
 								      delta_t);
+
+					////////////////////////////////////////////////
+					// Publish controller performance
+					debug_vect_s perf{};
+					perf.x = _ackermann_sp.steering_angle_velocity; // Setpoint (theta_dot_des)
+					perf.y = state.yawspeed; 				 			// Actual (theta_dot)
+					perf.z = steering_cmd; 								// Controller output (u)
+
+					if (_debug_vect_pub != nullptr) {
+						orb_publish(ORB_ID(debug_vect), _debug_vect_pub, &perf);
+
+					} else {
+						_debug_vect_pub = orb_advertise(ORB_ID(debug_vect), &perf);
+					}
+					////////////////////////////////////////////////
 				}
 
 				// Steering command
@@ -221,6 +239,7 @@ GroundRoverAckermannControl::task_main()
 
 				////////////////////////////////////////////////
 				// Publish controller performance
+				/*
 				debug_vect_s perf{};
 				perf.x = _ackermann_sp.speed; 		// Setpoint (v_des)
 				perf.y = state.vx; 				 	// Actual (v)
@@ -231,13 +250,16 @@ GroundRoverAckermannControl::task_main()
 
 				} else {
 					_debug_vect_pub = orb_advertise(ORB_ID(debug_vect), &perf);
-				}
+				}*/
 				////////////////////////////////////////////////
 
 				// ERPM command
 				actuator_outputs.control[actuator_controls_s::INDEX_THROTTLE] = erpm_cmd;
 
 			} else if (_ackermann_sp.manual_passthrough) {
+
+				// Hack for using torque setpoints
+				actuator_outputs.control[actuator_controls_s::INDEX_SPOILERS] = 1.0f;
 
 				// Steering
 				actuator_outputs.control[actuator_controls_s::INDEX_YAW] = _ackermann_sp.steering_angle;

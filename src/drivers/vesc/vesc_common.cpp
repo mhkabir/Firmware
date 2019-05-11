@@ -265,10 +265,11 @@ int parse_packet(UARTBuffer *const uart_buffer
 				} else {
 					PX4_ERR("Parser out of sync");
 				}
-
+				clear_buffer(uart_buffer);
 				payload_data_len = 0;
 				data_idx = 0;
 				state = HEAD;
+				return 0;
 				break;
 			}
 
@@ -277,11 +278,19 @@ int parse_packet(UARTBuffer *const uart_buffer
 				uart_buffer->head = 0;
 			}
 
-			uart_buffer->length--;
+			uart_buffer->length--; // TODO : this should never go negative!
 		}
 	}
 
 	return 0;
+}
+
+void clear_buffer(UARTBuffer *const uart_buffer)
+{
+	uart_buffer->head = 0;
+	uart_buffer->tail = 0;
+	uart_buffer->length = 0;
+	memset(uart_buffer->data, 0, sizeof(uint8_t)*UART_BUFFER_SIZE);
 }
 
 int unpack_payload(uint8_t *payload, uint8_t payload_len, float &erpm)

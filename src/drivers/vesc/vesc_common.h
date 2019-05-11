@@ -98,6 +98,8 @@ int parse_packet(UARTBuffer *const uart_buffer, uint8_t *payload);
  */
 int unpack_payload(uint8_t *payload, uint8_t payload_len, float &erpm);
 
+void clear_buffer(UARTBuffer *const uart_buffer);
+
 /**
  *  Lookup-table for faster CRC computation when sending ESC packets.
  */

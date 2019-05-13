@@ -1244,21 +1244,21 @@ void Ekf2::run()
 
 			// check for valid position data
 			if (PX4_ISFINITE(ev_odom.x) && PX4_ISFINITE(ev_odom.y) && PX4_ISFINITE(ev_odom.z)) {
-				ev_data.posNED(0) = ev_odom.x;
-				ev_data.posNED(1) = ev_odom.y;
-				ev_data.posNED(2) = ev_odom.z;
+				ev_data.pos(0) = ev_odom.x;
+				ev_data.pos(1) = ev_odom.y;
+				ev_data.pos(2) = ev_odom.z;
 
 				// position measurement error from parameters
 				if (PX4_ISFINITE(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_X_VARIANCE])) {
-					ev_data.posErr = fmaxf(_param_ekf2_evp_noise.get(),
-							       sqrtf(fmaxf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_X_VARIANCE],
-									   ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_Y_VARIANCE])));
-					ev_data.hgtErr = fmaxf(_param_ekf2_evp_noise.get(),
-							       sqrtf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_Z_VARIANCE]));
+					ev_data.posErr(0) = fmaxf(_param_ekf2_evp_noise.get(),
+								  sqrtf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_X_VARIANCE]));
+					ev_data.posErr(1) = fmaxf(_param_ekf2_evp_noise.get(),
+								  sqrtf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_Y_VARIANCE]));
+					ev_data.posErr(2) = fmaxf(_param_ekf2_evp_noise.get(),
+								  sqrtf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_Z_VARIANCE]));
 
 				} else {
-					ev_data.posErr = _param_ekf2_evp_noise.get();
-					ev_data.hgtErr = _param_ekf2_evp_noise.get();
+					ev_data.posErr(2) = ev_data.posErr(1) = ev_data.posErr(0) = _param_ekf2_evp_noise.get();
 				}
 			}
 
@@ -1266,20 +1266,21 @@ void Ekf2::run()
 			if (PX4_ISFINITE(ev_odom.q[0])) {
 				ev_data.quat = matrix::Quatf(ev_odom.q);
 
-				// orientation measurement error from parameters
-				if (PX4_ISFINITE(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_ROLL_VARIANCE])) {
-					ev_data.angErr = fmaxf(_param_ekf2_eva_noise.get(),
-							       sqrtf(fmaxf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_ROLL_VARIANCE],
-									   fmaxf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_PITCH_VARIANCE],
-											   ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_YAW_VARIANCE]))));
+				// yaw measurement error from parameters
+				if (PX4_ISFINITE(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_YAW_VARIANCE])) {
+					ev_data.yawErr = fmaxf(_param_ekf2_eva_noise.get(),
+							       sqrtf(ev_odom.pose_covariance[ev_odom.COVARIANCE_MATRIX_YAW_VARIANCE]));
 
 				} else {
-					ev_data.angErr = _param_ekf2_eva_noise.get();
+					ev_data.yawErr = _param_ekf2_eva_noise.get();
 				}
 			}
 
 			// only set data if all positions and orientation are valid
-			if (ev_data.posErr < ep_max_std_dev && ev_data.angErr < eo_max_std_dev) {
+			if (ev_data.posErr(0) < ep_max_std_dev &&
+			    ev_data.posErr(1) < ep_max_std_dev &&
+			    ev_data.posErr(2) < ep_max_std_dev &&
+			    ev_data.yawErr < eo_max_std_dev) {
 				// use timestamp from external computer, clocks are synchronized when using MAVROS
 				_ekf.setExtVisionData(ev_odom.timestamp, &ev_data);
 			}

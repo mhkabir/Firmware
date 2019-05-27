@@ -1318,7 +1318,7 @@ void Ekf2::run()
 
 		// use wheel odometry as another source of velocity data
 		bool wheel_odometry_updated = false;
-		//orb_check(_wheel_odometry_sub, &wheel_odometry_updated);
+		orb_check(_wheel_odometry_sub, &wheel_odometry_updated);
 
 		if (wheel_odometry_updated) {
 			wheel_odometry_s odom;

@@ -11,8 +11,8 @@ uint8 SETPOINT_TYPE_IDLE=5	# do nothing, switch off motors or keep at idle speed
 uint8 SETPOINT_TYPE_OFFBOARD=6 	# setpoint in NED frame (x, y, z, vx, vy, vz) set by offboard
 uint8 SETPOINT_TYPE_FOLLOW_TARGET=7  # setpoint in NED frame (x, y, z, vx, vy, vz) set by follow target
 
-uint8 VELOCITY_FRAME_LOCAL_NED = 1 # MAV_FRAME_LOCAL_NED
-uint8 VELOCITY_FRAME_BODY_NED = 8 # MAV_FRAME_BODY_NED
+uint8 FRAME_LOCAL_NED = 1 # MAV_FRAME_LOCAL_NED
+uint8 FRAME_BODY_NED = 8 # MAV_FRAME_BODY_NED
 
 bool valid			# true if setpoint is valid
 uint8 type			# setpoint type to adjust behavior of position controller
@@ -44,10 +44,11 @@ float32 loiter_radius		# loiter radius (only for fixed wing), in m
 int8 loiter_direction		# loiter direction: 1 = CW, -1 = CCW
 float32 pitch_min		# minimal pitch angle for fixed wing takeoff waypoints
 
-float32 a_x			# acceleration x setpoint
-float32 a_y			# acceleration y setpoint
-float32 a_z			# acceleration z setpoint
+float32 ax			# acceleration x setpoint
+float32 ay			# acceleration y setpoint
+float32 az			# acceleration z setpoint
 bool acceleration_valid		# true if acceleration setpoint is valid/should be used
+uint8 acceleration_frame		# to set acceleration setpoints in NED or body
 bool acceleration_is_force	# interprete acceleration as force
 
 float32 acceptance_radius   # navigation acceptance_radius if we're doing waypoint navigation

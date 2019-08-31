@@ -196,6 +196,9 @@ protected:
 	void updateParams() override;
 
 private:
+
+	static constexpr float CONSTANTS_ONE_G = 9.80665f; // m/s^2
+
 	/**
 	 * Maps setpoints to internal-setpoints.
 	 * @return true if mapping succeeded.
@@ -213,7 +216,8 @@ private:
 	float _yaw{0.0f}; /**< MC yaw */
 	matrix::Vector3f _pos_sp{}; /**< desired position */
 	matrix::Vector3f _vel_sp{}; /**< desired velocity */
-	matrix::Vector3f _acc_sp{}; /**< desired acceleration: not supported yet */
+	matrix::Vector3f _acc_sp{}; /**< desired acceleration */
+	matrix::Vector3f _jerk_sp{}; /**< desired jerk: not supported yet */
 	matrix::Vector3f _thr_sp{}; /**< desired thrust */
 	float _yaw_sp{}; /**< desired yaw */
 	float _yawspeed_sp{}; /** desired yaw-speed */

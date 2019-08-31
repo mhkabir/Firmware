@@ -166,8 +166,8 @@ bool FlightTaskOffboard::update()
 	// Possible inputs:
 	// 1. position setpoint
 	// 2. position setpoint + velocity setpoint (velocity used as feedforward)
-	// 3. velocity setpoint
-	// 4. acceleration setpoint -> this will be mapped to normalized thrust setpoint because acceleration is not supported
+	// 3. position setpoint + velocity setpoint + acceleration setpoint (velocity, acceleration used as feedforward)
+	// 4. velocity setpoint TODO: add vel + acc control
 	const bool position_ctrl_xy = _sub_triplet_setpoint->get().current.position_valid
 				      && _sub_vehicle_local_position->get().xy_valid;
 	const bool position_ctrl_z = _sub_triplet_setpoint->get().current.alt_valid
@@ -176,22 +176,32 @@ bool FlightTaskOffboard::update()
 				      && _sub_vehicle_local_position->get().v_xy_valid;
 	const bool velocity_ctrl_z = _sub_triplet_setpoint->get().current.velocity_valid
 				     && _sub_vehicle_local_position->get().v_z_valid;
-	const bool feedforward_ctrl_xy = position_ctrl_xy && velocity_ctrl_xy;
-	const bool feedforward_ctrl_z = position_ctrl_z && velocity_ctrl_z;
 	const bool acceleration_ctrl = _sub_triplet_setpoint->get().current.acceleration_valid;
+	const bool pos_vel_feedforward_ctrl_xy = position_ctrl_xy && velocity_ctrl_xy;
+	const bool pos_vel_feedforward_ctrl_z = position_ctrl_z && velocity_ctrl_z;
+	const bool pos_vel_acc_feedforward_ctrl_xy = position_ctrl_xy && velocity_ctrl_xy && acceleration_ctrl;
+	const bool pos_vel_acc_feedforward_ctrl_z = position_ctrl_z && velocity_ctrl_z && acceleration_ctrl;
 
 	// if nothing is valid in xy, then exit offboard
-	if (!(position_ctrl_xy || velocity_ctrl_xy || acceleration_ctrl)) {
+	if (!(position_ctrl_xy || velocity_ctrl_xy)) {
 		return false;
 	}
 
 	// if nothing is valid in z, then exit offboard
-	if (!(position_ctrl_z || velocity_ctrl_z || acceleration_ctrl)) {
+	if (!(position_ctrl_z || velocity_ctrl_z)) {
 		return false;
 	}
 
 	// XY-direction
-	if (feedforward_ctrl_xy) {
+	if (pos_vel_acc_feedforward_ctrl_xy) {
+		_position_setpoint(0) = _sub_triplet_setpoint->get().current.x;
+		_position_setpoint(1) = _sub_triplet_setpoint->get().current.y;
+		_velocity_setpoint(0) = _sub_triplet_setpoint->get().current.vx;
+		_velocity_setpoint(1) = _sub_triplet_setpoint->get().current.vy;
+		_acceleration_setpoint(0) = _sub_triplet_setpoint->get().current.ax;
+		_acceleration_setpoint(1) = _sub_triplet_setpoint->get().current.ay;
+
+	} else if (pos_vel_feedforward_ctrl_xy) {
 		_position_setpoint(0) = _sub_triplet_setpoint->get().current.x;
 		_position_setpoint(1) = _sub_triplet_setpoint->get().current.y;
 		_velocity_setpoint(0) = _sub_triplet_setpoint->get().current.vx;
@@ -203,14 +213,15 @@ bool FlightTaskOffboard::update()
 
 	} else if (velocity_ctrl_xy) {
 
-		if (_sub_triplet_setpoint->get().current.velocity_frame == position_setpoint_s::VELOCITY_FRAME_LOCAL_NED) {
+		if (_sub_triplet_setpoint->get().current.velocity_frame == position_setpoint_s::FRAME_LOCAL_NED) {
 			// in local frame: don't require any transformation
 			_velocity_setpoint(0) = _sub_triplet_setpoint->get().current.vx;
 			_velocity_setpoint(1) = _sub_triplet_setpoint->get().current.vy;
 
-		} else if (_sub_triplet_setpoint->get().current.velocity_frame == position_setpoint_s::VELOCITY_FRAME_BODY_NED) {
+		} else if (_sub_triplet_setpoint->get().current.velocity_frame == position_setpoint_s::FRAME_BODY_NED) {
 			// in body frame: need to transorm first
 			// Note, this transformation is wrong because body-xy is not neccessarily on the same plane as locale-xy
+			// TODO: use the full attitude quaternion here
 			_velocity_setpoint(0) = cosf(_yaw) * _sub_triplet_setpoint->get().current.vx - sinf(
 							_yaw) * _sub_triplet_setpoint->get().current.vy;
 			_velocity_setpoint(1) = sinf(_yaw) * _sub_triplet_setpoint->get().current.vx + cosf(
@@ -223,7 +234,12 @@ bool FlightTaskOffboard::update()
 	}
 
 	// Z-direction
-	if (feedforward_ctrl_z) {
+	if (pos_vel_acc_feedforward_ctrl_z) {
+		_position_setpoint(2) = _sub_triplet_setpoint->get().current.z;
+		_velocity_setpoint(2) = _sub_triplet_setpoint->get().current.vz;
+		_acceleration_setpoint(2) = _sub_triplet_setpoint->get().current.az;
+
+	} else if (pos_vel_feedforward_ctrl_z) {
 		_position_setpoint(2) = _sub_triplet_setpoint->get().current.z;
 		_velocity_setpoint(2) = _sub_triplet_setpoint->get().current.vz;
 
@@ -232,14 +248,6 @@ bool FlightTaskOffboard::update()
 
 	} else if (velocity_ctrl_z) {
 		_velocity_setpoint(2) = _sub_triplet_setpoint->get().current.vz;
-	}
-
-	// Acceleration
-	// Note: this is not supported yet and will be mapped to normalized thrust directly.
-	if (_sub_triplet_setpoint->get().current.acceleration_valid) {
-		_thrust_setpoint(0) = _sub_triplet_setpoint->get().current.a_x;
-		_thrust_setpoint(1) = _sub_triplet_setpoint->get().current.a_y;
-		_thrust_setpoint(2) = _sub_triplet_setpoint->get().current.a_z;
 	}
 
 	// use default conditions of upwards position or velocity to take off

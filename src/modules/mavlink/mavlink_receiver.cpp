@@ -847,9 +847,9 @@ MavlinkReceiver::handle_message_set_position_target_local_ned(mavlink_message_t 
 					if (!offboard_control_mode.ignore_acceleration_force) {
 
 						pos_sp_triplet.current.acceleration_valid = true;
-						pos_sp_triplet.current.a_x = set_position_target_local_ned.afx;
-						pos_sp_triplet.current.a_y = set_position_target_local_ned.afy;
-						pos_sp_triplet.current.a_z = set_position_target_local_ned.afz;
+						pos_sp_triplet.current.ax = set_position_target_local_ned.afx;
+						pos_sp_triplet.current.ay = set_position_target_local_ned.afy;
+						pos_sp_triplet.current.az = set_position_target_local_ned.afz;
 						pos_sp_triplet.current.acceleration_is_force = is_force_sp;
 
 					} else {

@@ -1812,9 +1812,9 @@ bool Mission::position_setpoint_equal(const position_setpoint_s *p1, const posit
 		(fabsf(p1->loiter_radius - p2->loiter_radius) < FLT_EPSILON) &&
 		(p1->loiter_direction == p2->loiter_direction) &&
 		(fabsf(p1->pitch_min - p2->pitch_min) < FLT_EPSILON) &&
-		(fabsf(p1->a_x - p2->a_x) < FLT_EPSILON) &&
-		(fabsf(p1->a_y - p2->a_y) < FLT_EPSILON) &&
-		(fabsf(p1->a_z - p2->a_z) < FLT_EPSILON) &&
+		(fabsf(p1->ax - p2->ax) < FLT_EPSILON) &&
+		(fabsf(p1->ay - p2->ay) < FLT_EPSILON) &&
+		(fabsf(p1->az - p2->az) < FLT_EPSILON) &&
 		(p1->acceleration_valid == p2->acceleration_valid) &&
 		(p1->acceleration_is_force == p2->acceleration_is_force) &&
 		(fabsf(p1->acceptance_radius - p2->acceptance_radius) < FLT_EPSILON) &&
